@@ -122,7 +122,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <main id="main" tabIndex={-1} className="mx-auto w-full max-w-6xl px-4 pb-10 pt-4 md:px-8 md:pt-6">
-        {ready ? children : <p className="text-sm text-muted">Connecting…</p>}
+        {/* Always render the page segment (prerendering needs it for instant-navigation validation);
+            keep it hidden until a session is confirmed in this tab. Signed-out visitors are redirected. */}
+        {ready ? null : <p className="text-sm text-muted">Connecting…</p>}
+        <div hidden={!ready}>{children}</div>
       </main>
     </div>
   );

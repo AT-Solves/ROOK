@@ -5,3 +5,4 @@ pydantic>=2.7
 httpx>=0.27
 cryptography>=42
 psycopg[binary]>=3.2
+tzdata>=2024.1  # IANA zones incl. legacy aliases browsers report (e.g. Asia/Calcutta); slim images lack system tzdata
