@@ -5,6 +5,7 @@ import type { ActionRef, Claim, RecommendedAction } from "@/lib/types";
 import { EvidenceList } from "./evidence";
 import { FollowupLauncher } from "./followup";
 import { ClaimBadge } from "./trust";
+import { ButtonLink } from "./ui";
 
 /**
  * Action comes third (UX §17). Each recommendation maps to a real capability; where ROOK has no capability yet
@@ -17,16 +18,16 @@ export function ActionControl({ action, riskId }: { action?: ActionRef | Record<
       return <FollowupLauncher commitmentId={action.commitment_id} riskId={action.risk_id ?? riskId} />;
     case "prepare_meeting":
       return (
-        <Link href={`/meetings/${action.meeting_id}`} className="text-sm font-medium text-accent hover:underline">
-          Open meeting preparation →
-        </Link>
+        <ButtonLink href={`/meetings/${action.meeting_id}`} variant="secondary" icon="calendar">
+          Open meeting preparation
+        </ButtonLink>
       );
     case "decide":
     case "review_decision":
       return (
-        <Link href={`/decisions/${action.decision_id}`} className="text-sm font-medium text-accent hover:underline">
-          Review the decision →
-        </Link>
+        <ButtonLink href={`/decisions/${action.decision_id}`} variant="secondary" icon="flag">
+          Review the decision
+        </ButtonLink>
       );
     case "assign_owner":
       return (
@@ -42,9 +43,9 @@ export function ActionControl({ action, riskId }: { action?: ActionRef | Record<
 export function RecommendationBlock({ rec, riskId }: { rec: RecommendedAction | null; riskId?: number }) {
   if (!rec) return null;
   return (
-    <div className="mt-3 rounded-md bg-[var(--rec-bg)] p-3">
-      <div className="flex items-start gap-2">
-        <ClaimBadge type="RECOMMENDATION" />
+    <div className="mt-3 rounded-[var(--radius-md)] border border-[#ecdcbf] border-l-[3px] border-l-gold bg-[var(--rec-bg)] p-3">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2.5">
+        <ClaimBadge type="RECOMMENDATION" className="self-start bg-white" />
         <p className="text-sm text-ink">{rec.text}</p>
       </div>
       <div className="mt-2">
@@ -56,9 +57,9 @@ export function RecommendationBlock({ rec, riskId }: { rec: RecommendedAction | 
 
 export function RecommendationClaim({ claim }: { claim: Claim }) {
   return (
-    <li className="rounded-md border border-line bg-surface p-3">
-      <div className="flex items-start gap-2">
-        <ClaimBadge type={claim.claim_type} />
+    <li className="rounded-[var(--radius-md)] border border-line border-l-[3px] border-l-gold bg-surface p-3 shadow-[var(--shadow-card)]">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2.5">
+        <ClaimBadge type={claim.claim_type} className="self-start" />
         <p className="text-sm text-ink">{claim.text}</p>
       </div>
       {claim.basis ? <p className="mt-1 text-xs text-muted">{claim.basis}</p> : null}

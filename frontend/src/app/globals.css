@@ -1,50 +1,83 @@
 @import "tailwindcss";
 
-/* ROOK design tokens: calm neutral base, restrained status colour (UX §16). All text pairs meet WCAG AA. */
+/*
+ * ROOK design system — tokens (source of truth: ROOK chess-themed design reference).
+ * Palette: Midnight #0B1220 · Rook Gold #D4AF7C · Board Light #F8F7F4 · Chess Gray #475569 ·
+ *          Slate #1E293B · Success #16A34A · Warning #F59E0B · Risk #DC2626.
+ * Gold is a restrained accent: decorative strokes, icons, fills behind dark text — never body text on light.
+ */
 :root {
-  --bg: #f6f6f3;
-  --surface: #ffffff;
-  --ink: #1b1f24;
-  --muted: #555c64;
-  --line: #e2e2dc;
-  --accent: #1f4e79;
-  --focus: #1a5fd0;
-  --fact-bg: #edf0f3;   --fact-ink: #2b3743;
-  --inf-bg: #fbf2e3;    --inf-ink: #6f4304;
-  --rec-bg: #e8f0fa;    --rec-ink: #1b4a87;
-  --unk-bg: #f1f1f1;    --unk-ink: #4d4d4d;
-  --high-bg: #f9ecea;   --high-ink: #8a2018;
-  --med-bg: #fbf2e3;    --med-ink: #6f4304;
-  --low-bg: #edf0f3;    --low-ink: #2b3743;
-}
+  /* brand */
+  --rook-midnight: #0b1220;
+  --rook-slate: #1e293b;
+  --rook-gold: #d4af7c;
+  --rook-gold-deep: #8a6420; /* gold-family text colour that meets AA on light surfaces */
+  --rook-board-light: #f8f7f4;
+  --rook-chess-gray: #475569;
+  --rook-success: #16a34a;
+  --rook-warning: #f59e0b;
+  --rook-risk: #dc2626;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #121417;
-    --surface: #1a1d21;
-    --ink: #e7e9ec;
-    --muted: #a6adb5;
-    --line: #2c3036;
-    --accent: #8db8e8;
-    --focus: #7fb0ff;
-    --fact-bg: #262c33;   --fact-ink: #d5dde6;
-    --inf-bg: #33281a;    --inf-ink: #f0c98a;
-    --rec-bg: #1d2a3b;    --rec-ink: #a9c9f2;
-    --unk-bg: #2a2a2a;    --unk-ink: #c9c9c9;
-    --high-bg: #3a1f1d;   --high-ink: #f2b3ab;
-    --med-bg: #33281a;    --med-ink: #f0c98a;
-    --low-bg: #262c33;    --low-ink: #d5dde6;
-  }
+  /* surfaces & text */
+  --bg: var(--rook-board-light);
+  --surface: #ffffff;
+  --surface-sunken: #f1efe9;
+  --ink: var(--rook-midnight);
+  --ink-soft: var(--rook-slate);
+  --muted: var(--rook-chess-gray);
+  --line: #e4e1d8;
+  --line-strong: #cfcabd;
+  --accent: var(--rook-midnight);
+  --focus: var(--rook-gold-deep);
+
+  /* semantic chips (status chips row of the reference); text colours meet WCAG AA on their tint */
+  --fact-bg: #eaf1fd;   --fact-ink: #1d4ed8;   --fact-dot: #2563eb;
+  --inf-bg: #f1ecfd;    --inf-ink: #6d28d9;    --inf-dot: #7c3aed;
+  --rec-bg: #faf3e6;    --rec-ink: #7a5718;    --rec-dot: var(--rook-gold);
+  --unk-bg: #f1f2f4;    --unk-ink: #475569;    --unk-dot: #94a3b8;
+  --high-bg: #fdeceb;   --high-ink: #b91c1c;   --high-icon: var(--rook-risk);
+  --med-bg: #fef4e2;    --med-ink: #92400e;    --med-icon: var(--rook-warning);
+  --low-bg: #f1f2f4;    --low-ink: #475569;    --low-icon: #94a3b8;
+  --ok-bg: #e9f6ee;     --ok-ink: #15803d;     --ok-icon: var(--rook-success);
+  --up-bg: #eaf1fd;     --up-ink: #1d4ed8;     --up-icon: #2563eb;
+  --done-bg: #eef0f3;   --done-ink: #475569;   --done-icon: #64748b;
+
+  /* radius / shadow / motion */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 2px rgb(11 18 32 / 0.04), 0 1px 1px rgb(11 18 32 / 0.03);
+  --shadow-raised: 0 6px 18px -8px rgb(11 18 32 / 0.18), 0 1px 2px rgb(11 18 32 / 0.05);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-sunken: var(--surface-sunken);
   --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-midnight: var(--rook-midnight);
+  --color-slate: var(--rook-slate);
+  --color-gold: var(--rook-gold);
+  --color-gold-deep: var(--rook-gold-deep);
+  --color-board: var(--rook-board-light);
+  --color-chess: var(--rook-chess-gray);
+  --color-success: var(--rook-success);
+  --color-warning: var(--rook-warning);
+  --color-risk: var(--rook-risk);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: var(--font-cormorant), "Iowan Old Style", Georgia, serif;
+  --font-wordmark: var(--font-cinzel), "Trajan Pro", Georgia, serif;
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
 }
 
 html {
@@ -55,12 +88,56 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
 }
 
+/* Gold focus ring on light surfaces (deep gold for 3:1 non-text contrast); bright gold on dark surfaces. */
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
   border-radius: 4px;
+}
+.surface-dark :focus-visible {
+  outline-color: var(--rook-gold);
+}
+
+/* ---------------------------------------------------------------- chessboard motifs (brand texture, not a game) */
+.board-light {
+  background-color: var(--rook-board-light);
+  background-image: conic-gradient(rgb(11 18 32 / 0.028) 25%, transparent 0 50%, rgb(11 18 32 / 0.028) 0 75%, transparent 0);
+  background-size: 48px 48px;
+}
+.board-dark {
+  background-color: var(--rook-midnight);
+  background-image: conic-gradient(rgb(255 255 255 / 0.035) 25%, transparent 0 50%, rgb(255 255 255 / 0.035) 0 75%, transparent 0);
+  background-size: 40px 40px;
+}
+/* Header gradient: midnight with a faint board that fades toward the content. */
+.board-hero {
+  background-color: var(--rook-midnight);
+  background-image:
+    linear-gradient(100deg, rgb(11 18 32 / 0.96) 0%, rgb(11 18 32 / 0.86) 55%, rgb(30 41 59 / 0.75) 100%),
+    conic-gradient(rgb(255 255 255 / 0.06) 25%, transparent 0 50%, rgb(255 255 255 / 0.06) 0 75%, transparent 0);
+  background-size: auto, 44px 44px;
+}
+/* Section rule: a short gold bar under section titles. */
+.gold-rule::after {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 2px;
+  margin-top: 6px;
+  background: var(--rook-gold);
+  border-radius: 1px;
+}
+
+/* restrained interactions */
+.lift {
+  transition: box-shadow 160ms var(--ease), transform 160ms var(--ease), border-color 160ms var(--ease);
+}
+.lift:hover {
+  box-shadow: var(--shadow-raised);
+  border-color: var(--line-strong);
 }
 
 @media (prefers-reduced-motion: reduce) {

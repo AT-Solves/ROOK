@@ -9,6 +9,9 @@ const OUT = "../docs/screenshots";
 
 test("capture P0 screens", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/login");
+  await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
+  await page.screenshot({ path: `${OUT}/00-login.png` });
   await signIn(page);
   await page.screenshot({ path: `${OUT}/01-home.png`, fullPage: true });
 
@@ -48,6 +51,18 @@ test("capture P0 screens", async ({ page }) => {
   await page.goto("/evidence/1");
   await expect(page.getByText("Source type", { exact: true })).toBeVisible();
   await page.screenshot({ path: `${OUT}/09-evidence.png`, fullPage: true });
+
+  await page.goto("/meetings");
+  await expect(page.getByRole("heading", { level: 1, name: "Meetings" })).toBeVisible();
+  await page.screenshot({ path: `${OUT}/11-meetings.png`, fullPage: true });
+
+  await page.goto("/risks");
+  await expect(page.getByRole("heading", { level: 1, name: "Risks" })).toBeVisible();
+  await page.screenshot({ path: `${OUT}/12-risks.png`, fullPage: true });
+
+  await page.goto("/decisions?tab=all");
+  await expect(page.getByRole("heading", { level: 1, name: "Decisions" })).toBeVisible();
+  await page.screenshot({ path: `${OUT}/13-decisions.png`, fullPage: true });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

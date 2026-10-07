@@ -35,8 +35,10 @@ Any frontend work, UI copy, or API shape decision driven by a screen.
 - **States**: every screen has a meaningful empty state, progressive loading states (Connecting
   → Syncing → Analyzing → Preparing → Ready), and errors that say what failed, what the user can
   do, and whether partial results are shown (UX §12–14).
-- **Visual**: calm neutral base, strong typography, restrained status colour, dense but
-  uncluttered. Desktop first, and responsive for tablet and phone briefing (UX §16, §18).
+- **Visual**: the ROOK chess-inspired design system (`docs/design/DESIGN_SYSTEM.md`, ADR-0008) —
+  Midnight/Rook Gold palette, geometric rook logo, one icon family, board-texture motifs. Use its tokens and
+  shared components; never style page by page or introduce other palettes, icon sets or logos. Gold is an
+  accent, never body text on light surfaces. Desktop first, and responsive for tablet and phone briefing (UX §16, §18).
 - **Epistemic clarity**: visibly distinguish fact, inference, recommendation and unknown.
   Inferred items read as suggestions that need confirmation. "ROOK must decompose mixed answers into individually typed claims rather than assigning one weakest-confidence label to the entire response." A composite
   answer is shown as separately labelled units (`components/ask.tsx::DirectUnits`), never with one badge

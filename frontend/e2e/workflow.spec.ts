@@ -44,7 +44,7 @@ test("executive workflow: attention → meeting → evidence → ask → recomme
   // 8. Ask ROOK
   await page.getByRole("link", { name: "Ask ROOK" }).click();
   await page.getByLabel("Ask ROOK a question").fill("What changed and what should I do?");
-  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await page.getByRole("button", { name: "Ask ROOK", exact: true }).click();
   const answer = page.getByRole("article");
   // C-008: one typed unit per kind of claim, in order; no single label for the whole answer
   const units = answer.locator("[data-unit-type]");

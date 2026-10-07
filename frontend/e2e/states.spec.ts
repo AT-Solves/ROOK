@@ -34,7 +34,7 @@ test("unknown answers say so instead of guessing", async ({ page }) => {
   await signIn(page);
   await page.goto("/ask");
   await page.getByLabel("Ask ROOK a question").fill("What did we decide about the office move?");
-  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await page.getByRole("button", { name: "Ask ROOK", exact: true }).click();
   const answer = page.getByRole("article");
   await expect(answer).toContainText("I couldn't find enough evidence");
   await expect(answer.locator("[data-claim-type]").first()).toHaveAttribute("data-claim-type", "UNKNOWN");
