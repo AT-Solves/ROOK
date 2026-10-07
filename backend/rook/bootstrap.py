@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,19 +20,23 @@ DEFAULT_POLICY = {
 }
 
 
-def ensure_demo_tenant(db: Session, sync: bool = True) -> Organization:
+def ensure_demo_tenant(db: Session, sync: bool = True, timezone: str | None = None) -> Organization:
+    """Demo tenant. Its users and its meeting times share one time zone: `timezone`, else
+    ROOK_DEMO_TIMEZONE, else UTC — so the synthetic agenda falls in that zone's working hours."""
     org = db.scalar(select(Organization).where(Organization.slug == "acme"))
+    tz = timezone or os.environ.get("ROOK_DEMO_TIMEZONE") or "UTC"
     if org is None:
         org = Organization(name="Acme Robotics", slug="acme", ai_policy=dict(DEFAULT_POLICY))
         db.add(org)
         db.flush()
         db.add_all([
             User(org_id=org.id, email="yamini@acme.example", name="Yamini Devasena",
-                 title="Chief Executive Officer", role="admin"),
-            User(org_id=org.id, email="marcus@acme.example", name="Marcus Chen", title="VP Engineering", role="member"),
+                 title="Chief Executive Officer", role="admin", timezone=tz),
+            User(org_id=org.id, email="marcus@acme.example", name="Marcus Chen", title="VP Engineering", role="member",
+                 timezone=tz),
         ])
         db.flush()
-        connect_demo(db, org.id)
+        connect_demo(db, org.id).config = {"timezone": tz}
         db.commit()
         if sync:
             for c in org_connectors(db, org.id):
