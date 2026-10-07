@@ -19,7 +19,7 @@ export default function DecisionsPage() {
   const [tab, setTab] = useTab(IDS, "pending");
   return (
     <>
-      <PageHeader title="Decisions" subtitle="The decision register: what was decided, by whom, why, and where it was stated." />
+      <PageHeader module="decisions" title="Decisions" subtitle="The decision register: what was decided, by whom, why, and where it was stated." />
       <StateGate
         state={state}
         what="the decision register"

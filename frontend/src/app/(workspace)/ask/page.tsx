@@ -13,6 +13,7 @@ export default function AskPage() {
   return (
     <>
       <PageHeader
+        module="ask"
         title="Ask ROOK"
         subtitle="Answers come only from sources you can access. Every claim is labelled Fact, Inference, Recommendation or Unknown."
       />

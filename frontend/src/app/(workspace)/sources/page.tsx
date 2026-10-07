@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 import { Empty, StateGate } from "@/components/states";
-import { PageHeader, Section, buttonClass, primaryButtonClass } from "@/components/ui";
+import { FeatureTile, type IconName } from "@/components/icons";
+import { Button, PageHeader, Section } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useSearchParam } from "@/lib/location";
@@ -21,18 +22,18 @@ export default function SourcesPage() {
     : null;
   return (
     <>
-      <PageHeader title="Sources" subtitle="ROOK reads only what you can access in each system, and keeps each item's original permissions." />
-      {notice ? <p role="status" className="mb-4 rounded-md border border-line bg-surface p-3 text-sm">{notice}</p> : null}
+      <PageHeader module="sources" title="Sources" subtitle="ROOK reads only what you can access in each system, and keeps each item's original permissions." />
+      {notice ? <p role="status" className="mb-6 rounded-[var(--radius-md)] border border-line border-l-[3px] border-l-success bg-surface p-3 text-sm shadow-[var(--shadow-card)]">{notice}</p> : null}
       <StateGate state={state} what="your sources" stage="Connecting">
         {(items) => {
           const available = items.filter((s) => s.phase <= 1 && s.kind !== "manual");
           const planned = items.filter((s) => s.phase > 1);
           return (
             <>
-              <Section title="Available" id="s-available" count={available.length}>
+              <Section title="Available" id="s-available" count={available.length} icon="database">
                 <ul className="space-y-3">{available.map((s) => <SourceRow key={s.kind} s={s} onChange={state.reload} />)}</ul>
               </Section>
-              <Section title="Planned" id="s-planned" count={planned.length}>
+              <Section title="Planned" id="s-planned" count={planned.length} icon="clock">
                 <p className="text-sm text-muted">{planned.map((p) => p.name).join(", ")} — not available in this version.</p>
               </Section>
             </>
@@ -42,6 +43,8 @@ export default function SourcesPage() {
     </>
   );
 }
+
+const SOURCE_ICON: Record<string, IconName> = { microsoft365: "email", demo: "database", manual: "document" };
 
 function SourceRow({ s, onChange }: { s: SourceCatalogItem; onChange: () => void }) {
   const [stage, setStage] = useState<null | "Connecting" | "Syncing">(null);
@@ -76,26 +79,29 @@ function SourceRow({ s, onChange }: { s: SourceCatalogItem; onChange: () => void
 
   const status = conn ? { connected: "Connected", needs_reauth: "Needs reconnecting", needs_configuration: "Needs configuration", disconnected: "Disconnected" }[conn.status] ?? conn.status : "Not connected";
   return (
-    <li className="rounded-lg border border-line bg-surface p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="font-medium">{s.name}</p>
+    <li className="lift rounded-[var(--radius-md)] border border-line bg-surface p-4 shadow-[var(--shadow-card)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <FeatureTile name={SOURCE_ICON[s.kind] ?? "database"} size={40} />
+          <div>
+          <p className="font-semibold text-midnight">{s.name}</p>
           <p className="text-xs text-muted">
             {status}
             {conn?.last_synced_at ? ` · last synced ${formatDateTime(conn.last_synced_at)}` : ""}
             {s.delegated ? " · connected per user, with your own access" : ""}
           </p>
+          </div>
         </div>
         <div className="flex gap-2">
           {s.delegated && (!conn || conn.status !== "connected") ? (
             s.credentials_present ? (
-              <button type="button" className={primaryButtonClass} onClick={connect} disabled={!!stage}>{stage === "Connecting" ? "Connecting…" : conn ? "Reconnect" : "Connect"}</button>
+              <Button variant="primary" icon="related" onClick={connect} disabled={!!stage}>{stage === "Connecting" ? "Connecting…" : conn ? "Reconnect" : "Connect"}</Button>
             ) : (
               <span className="text-xs text-muted">Not configured on this server (administrator setup required)</span>
             )
           ) : null}
           {conn && conn.status === "connected" ? (
-            <button type="button" className={buttonClass} onClick={sync} disabled={!!stage}>{stage === "Syncing" ? "Syncing…" : "Sync now"}</button>
+            <Button variant="action" icon="refresh" onClick={sync} disabled={!!stage}>{stage === "Syncing" ? "Syncing…" : "Sync now"}</Button>
           ) : null}
         </div>
       </div>

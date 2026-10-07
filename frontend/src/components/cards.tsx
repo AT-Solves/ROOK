@@ -1,9 +1,22 @@
+import type { ReactNode } from "react";
+
 import { formatDate } from "@/lib/format";
 import type { Commitment, Decision, Risk } from "@/lib/types";
 
 import { RecommendationBlock } from "./actions";
+import { Icon, type IconName } from "./icons";
 import { InsightCard } from "./insight";
 import { ClaimBadge, LevelPill, StatusText } from "./trust";
+
+/** Compact metadata item: small gold-accented icon + text. */
+export function Meta({ icon, children }: { icon: IconName; children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Icon name={icon} size={14} accent className="text-chess" />
+      {children}
+    </span>
+  );
+}
 
 export function CommitmentCard({ c, showAction = false }: { c: Commitment; showAction?: boolean }) {
   return (
@@ -14,11 +27,11 @@ export function CommitmentCard({ c, showAction = false }: { c: Commitment; showA
       confidence={c.confidence}
       meta={
         <>
-          <span>{c.mine ? "You" : c.owner}</span>
-          <span>Due {c.due_date ? formatDate(c.due_date) : "not stated"}</span>
+          <Meta icon="person">{c.mine ? "You" : c.owner}</Meta>
+          <Meta icon="clock">Due {c.due_date ? formatDate(c.due_date) : "not stated"}</Meta>
           <StatusText status={c.status} />
           {c.status === "overdue" ? <ClaimBadge type={c.status_claim_type} /> : null}
-          {c.project ? <span>{c.project}</span> : null}
+          {c.project ? <Meta icon="briefcase">{c.project}</Meta> : null}
         </>
       }
       why={c.status === "overdue" ? c.status_basis : c.kind === "inferred" ? "ROOK inferred this action; it needs an owner before it is tracked." : undefined}
@@ -42,11 +55,11 @@ export function DecisionCard({ d }: { d: Decision }) {
       confidence={d.confidence}
       meta={
         <>
-          <span className="font-mono">{d.code}</span>
+          <span className="rounded-[4px] bg-sunken px-1.5 py-0.5 font-mono text-[11px] text-ink-soft">{d.code}</span>
           <StatusText status={d.status} />
-          <span>{d.status === "pending" ? `Awaiting ${d.needs_me ? "you" : d.owner || "a decision owner"}` : `By ${d.owner || "unknown"}`}</span>
-          <span>{formatDate(d.decided_at)}</span>
-          {d.project ? <span>{d.project}</span> : null}
+          <Meta icon="person">{d.status === "pending" ? `Awaiting ${d.needs_me ? "you" : d.owner || "a decision owner"}` : `By ${d.owner || "unknown"}`}</Meta>
+          <Meta icon="calendar">{formatDate(d.decided_at)}</Meta>
+          {d.project ? <Meta icon="briefcase">{d.project}</Meta> : null}
         </>
       }
       evidence={d.evidence}
@@ -64,7 +77,7 @@ export function RiskCard({ r, withAction = true }: { r: Risk; withAction?: boole
       meta={
         <>
           <LevelPill level={r.level} />
-          {r.project ? <span>{r.project}</span> : null}
+          {r.project ? <Meta icon="briefcase">{r.project}</Meta> : null}
           {r.status !== "open" ? <StatusText status={r.status} /> : null}
         </>
       }

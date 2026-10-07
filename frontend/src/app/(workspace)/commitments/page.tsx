@@ -36,7 +36,7 @@ export default function CommitmentsPage() {
   const [tab, setTab] = useTab(IDS, "waiting");
   return (
     <>
-      <PageHeader title="Commitments" subtitle="Who committed to what, by when, and the source where it was said." />
+      <PageHeader module="commitments" title="Commitments" subtitle="Who committed to what, by when, and the source where it was said." />
       <StateGate
         state={state}
         what="commitments"

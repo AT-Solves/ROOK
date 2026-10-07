@@ -11,6 +11,7 @@ export default function RisksPage() {
   return (
     <>
       <PageHeader
+        module="risks"
         title="Risks"
         subtitle="Every risk is ROOK's inference: it states why it was detected and which sources support it. There are no hidden scores."
       />

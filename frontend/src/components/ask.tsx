@@ -6,9 +6,11 @@ import { ApiError, api } from "@/lib/api";
 import type { AskAnswer, Claim, ClaimType } from "@/lib/types";
 
 import { ActionControl, RecommendationClaim } from "./actions";
+import { RookMark } from "./brand";
 import { EvidenceList, SourceLine } from "./evidence";
+import { Icon, type IconName } from "./icons";
 import { ClaimBadge, ConfidenceLabel } from "./trust";
-import { primaryButtonClass } from "./ui";
+import { Button } from "./ui";
 
 export const MVP_QUESTIONS = [
   "What changed and what should I do?",
@@ -48,22 +50,25 @@ export function AskForm({ onAnswer, compact = false }: { onAnswer: (a: AskAnswer
           e.preventDefault();
           submit(q);
         }}
-        className="flex gap-2"
+        className="flex flex-col gap-2 sm:flex-row"
       >
         <label htmlFor={inputId} className="sr-only">
           Ask ROOK a question
         </label>
-        <input
-          id={inputId}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Ask ROOK — e.g. “What changed and what should I do?”"
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2 text-sm"
-          maxLength={1000}
-        />
-        <button type="submit" className={primaryButtonClass} disabled={busy || !q.trim()}>
-          {busy ? "Analyzing…" : "Ask"}
-        </button>
+        <div className="relative min-w-0 flex-1">
+          <Icon name="search" size={18} accent className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-chess" />
+          <input
+            id={inputId}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Ask ROOK — e.g. “What changed and what should I do?”"
+            className="w-full rounded-[10px] border border-line-strong bg-white py-2.5 pl-10 pr-3 text-sm text-midnight placeholder:text-chess"
+            maxLength={1000}
+          />
+        </div>
+        <Button type="submit" variant="primary" rook={<RookMark tone="gold" size={18} />} disabled={busy || !q.trim()}>
+          {busy ? "Analyzing…" : "Ask ROOK"}
+        </Button>
       </form>
       {!compact ? (
         <div className="mt-3 flex flex-wrap gap-2" aria-label="Suggested questions">
@@ -73,7 +78,7 @@ export function AskForm({ onAnswer, compact = false }: { onAnswer: (a: AskAnswer
               type="button"
               disabled={busy}
               onClick={() => submit(s)}
-              className="rounded-full border border-line bg-surface px-3 py-1 text-xs text-ink hover:bg-bg"
+              className="lift rounded-full border border-line bg-white px-3 py-1 text-xs text-ink-soft hover:border-gold hover:text-midnight"
             >
               {s}
             </button>
@@ -81,7 +86,8 @@ export function AskForm({ onAnswer, compact = false }: { onAnswer: (a: AskAnswer
         </div>
       ) : null}
       {busy ? (
-        <p role="status" className="mt-2 text-sm text-muted">
+        <p role="status" className="mt-2 flex items-center gap-2 text-sm text-muted">
+          <RookMark tone="midnight" size={16} className="animate-pulse" />
           Analyzing your permitted sources…
         </p>
       ) : null}
@@ -98,7 +104,7 @@ function RecommendationList({ claims, id }: { claims: Claim[]; id: string }) {
   if (!claims.length) return null;
   return (
     <section aria-labelledby={id} className="mt-4">
-      <h3 id={id} className="text-xs font-semibold uppercase tracking-wide text-muted">
+      <h3 id={id} className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
         Recommended action
       </h3>
       <ul className="mt-2 space-y-2">
@@ -114,14 +120,14 @@ function ClaimList({ title, claims, id }: { title: string; claims: Claim[]; id: 
   if (!claims.length) return null;
   return (
     <section aria-labelledby={id} className="mt-4">
-      <h3 id={id} className="text-xs font-semibold uppercase tracking-wide text-muted">
+      <h3 id={id} className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
         {title}
       </h3>
       <ul className="mt-2 space-y-2">
         {claims.map((c, i) => (
-          <li key={i} className="rounded-md border border-line bg-surface p-3">
-            <div className="flex items-start gap-2">
-              <ClaimBadge type={c.claim_type} />
+          <li key={i} className="rounded-[var(--radius-md)] border border-line bg-surface p-3">
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2.5">
+              <ClaimBadge type={c.claim_type} className="self-start" />
               <div className="min-w-0">
                 <p className="text-sm text-ink">{c.text}</p>
                 {c.meta ? <p className="text-xs text-muted">{c.meta}</p> : null}
@@ -140,6 +146,14 @@ function ClaimList({ title, claims, id }: { title: string; claims: Claim[]; id: 
   );
 }
 
+/** Each claim type has its own heading, icon and edge — the four parts never rely on colour alone. */
+const UNIT_STYLE: Record<ClaimType, { icon: IconName; edge: string }> = {
+  FACT: { icon: "document", edge: "border-l-[var(--fact-dot)]" },
+  INFERENCE: { icon: "insight", edge: "border-l-[var(--inf-dot)]" },
+  RECOMMENDATION: { icon: "target", edge: "border-l-gold" },
+  UNKNOWN: { icon: "search", edge: "border-l-[var(--unk-dot)] border-dashed" },
+};
+
 const UNIT_HEADING: Record<ClaimType, string> = {
   FACT: "What changed",
   INFERENCE: "Why it may matter",
@@ -152,10 +166,11 @@ function DirectUnits({ units, id }: { units: Claim[]; id: string }) {
   return (
     <ol aria-labelledby={id} className="mt-3 space-y-3">
       {units.map((u, i) => (
-        <li key={i} className="rounded-md border border-line p-3" data-unit-type={u.claim_type}>
+        <li key={i} className={`rounded-[var(--radius-md)] border border-line border-l-[3px] bg-surface p-3.5 shadow-[var(--shadow-card)] ${UNIT_STYLE[u.claim_type].edge}`} data-unit-type={u.claim_type}>
           <div className="flex flex-wrap items-center gap-2">
+            <Icon name={UNIT_STYLE[u.claim_type].icon} size={16} accent className="text-midnight" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">{UNIT_HEADING[u.claim_type]}</span>
             <ClaimBadge type={u.claim_type} />
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">{UNIT_HEADING[u.claim_type]}</span>
             {u.claim_type !== "UNKNOWN" ? <ConfidenceLabel value={u.confidence} /> : null}
           </div>
           <p className="mt-1 text-[15px] leading-relaxed text-ink">{u.text}</p>
@@ -181,16 +196,19 @@ export function AnswerView({ a }: { a: AskAnswer }) {
   const base = useId();
   const keyPoints = a.what_changed.length || a.why_it_matters.length ? [] : a.key_points;
   return (
-    <article aria-labelledby={`${base}-q`} className="rounded-lg border border-line bg-surface p-5">
-      <p id={`${base}-q`} className="text-xs font-medium uppercase tracking-wide text-muted">
-        {a.question}
-      </p>
+    <article aria-labelledby={`${base}-q`} className="rounded-[var(--radius-lg)] border border-line bg-surface p-5 shadow-[var(--shadow-card)]">
+      <div className="flex items-center gap-2.5 border-b border-line pb-3">
+        <RookMark tone="midnight" size={20} />
+        <p id={`${base}-q`} className="font-[family-name:var(--font-display)] text-xl font-semibold text-midnight">
+          {a.question}
+        </p>
+      </div>
       {a.composite ? (
         <>
           <p className="mt-2 text-sm text-muted">{a.answer}</p>
           <DirectUnits units={a.units} id={`${base}-q`} />
           <details className="mt-4">
-            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted">
+            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
               All details · {a.what_changed.length + a.why_it_matters.length + a.recommended_actions.length + a.unknowns.length} statements
             </summary>
             <ClaimList title="What changed" claims={a.what_changed} id={`${base}-wc`} />
@@ -221,10 +239,10 @@ export function AnswerView({ a }: { a: AskAnswer }) {
 
       {a.sources.length ? (
         <details className="mt-4">
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted">
+          <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
             Sources · {a.sources.length}
           </summary>
-          <ul className="mt-2 space-y-2 border-l-2 border-line pl-3">
+          <ul className="mt-2 space-y-2.5 border-l-2 border-gold/60 pl-3">
             {a.sources.map((s) => (
               <SourceLine key={s.signal_id} e={s} />
             ))}

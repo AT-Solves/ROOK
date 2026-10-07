@@ -7,7 +7,8 @@ import type { ActionProposal } from "@/lib/types";
 
 import { EvidenceList } from "./evidence";
 import { ClaimBadge } from "./trust";
-import { buttonClass, primaryButtonClass } from "./ui";
+import { Icon } from "./icons";
+import { Button } from "./ui";
 
 const TONES = ["executive", "concise", "diplomatic", "direct", "collaborative", "formal"] as const;
 
@@ -40,16 +41,16 @@ export function FollowupLauncher({ commitmentId, riskId, label = "Draft follow-u
       <label htmlFor={toneId} className="sr-only">
         Tone
       </label>
-      <select id={toneId} value={tone} onChange={(e) => setTone(e.target.value)} className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm">
+      <select id={toneId} value={tone} onChange={(e) => setTone(e.target.value)} className="rounded-[10px] border border-line-strong bg-white px-2.5 py-2 text-sm text-midnight">
         {TONES.map((t) => (
           <option key={t} value={t}>
             {t[0].toUpperCase() + t.slice(1)} tone
           </option>
         ))}
       </select>
-      <button type="button" className={buttonClass} onClick={create} disabled={busy}>
+      <Button variant="action" icon="send" onClick={create} disabled={busy}>
         {busy ? "Preparing draft…" : label}
-      </button>
+      </Button>
       {error ? (
         <p role="alert" className="w-full text-sm text-[var(--high-ink)]">
           {error}
@@ -84,16 +85,18 @@ export function FollowupDraft({ initial, onClose }: { initial: ActionProposal; o
   }
 
   return (
-    <section aria-labelledby={ids.heading} className="mt-2 rounded-lg border border-line bg-surface p-4">
+    <section aria-labelledby={ids.heading} className="mt-3 rounded-[var(--radius-md)] border border-line border-t-[3px] border-t-midnight bg-surface p-4 shadow-[var(--shadow-raised)]">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 id={ids.heading} className="text-sm font-semibold">
+        <Icon name="send" size={18} accent className="text-midnight" />
+        <h3 id={ids.heading} className="text-sm font-semibold text-midnight">
           {p.title}
         </h3>
         <ClaimBadge type="RECOMMENDATION" />
         <span className="text-xs text-muted">Status: {p.status}</span>
       </div>
       {editable ? (
-        <p className="mt-2 rounded bg-[var(--rec-bg)] px-3 py-2 text-sm text-[var(--rec-ink)]">
+        <p className="mt-3 flex items-center gap-2 rounded-[8px] border border-[#ecdcbf] bg-[var(--rec-bg)] px-3 py-2 text-sm text-[var(--rec-ink)]">
+          <Icon name="lock" size={16} accent className="text-[var(--rec-ink)]" />
           Nothing is sent until you approve. Review and edit the draft below.
         </p>
       ) : null}
@@ -118,7 +121,7 @@ export function FollowupDraft({ initial, onClose }: { initial: ActionProposal; o
           </label>
           <input
             id={ids.subject}
-            className="mt-0.5 w-full rounded-md border border-line bg-surface px-2 py-1.5"
+            className="mt-0.5 w-full rounded-[8px] border border-line-strong bg-white px-2.5 py-1.5"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             disabled={!editable}
@@ -131,7 +134,7 @@ export function FollowupDraft({ initial, onClose }: { initial: ActionProposal; o
           <textarea
             id={ids.body}
             rows={8}
-            className="mt-0.5 w-full rounded-md border border-line bg-surface px-2 py-1.5 font-[inherit]"
+            className="mt-0.5 w-full rounded-[8px] border border-line-strong bg-white px-2.5 py-1.5 font-[inherit] leading-relaxed"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             disabled={!editable}
@@ -141,16 +144,16 @@ export function FollowupDraft({ initial, onClose }: { initial: ActionProposal; o
 
       {editable ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className={primaryButtonClass} onClick={() => run("approve")} disabled={!!busy}>
+          <Button variant="approve" icon="checkCircle" onClick={() => run("approve")} disabled={!!busy}>
             {busy === "approve" ? "Approving…" : "Approve and send"}
-          </button>
-          <button type="button" className={buttonClass} onClick={() => run("reject")} disabled={!!busy}>
+          </Button>
+          <Button variant="quiet" onClick={() => run("reject")} disabled={!!busy}>
             {busy === "reject" ? "Discarding…" : "Discard draft"}
-          </button>
+          </Button>
           {onClose ? (
-            <button type="button" className={buttonClass} onClick={onClose} disabled={!!busy}>
+            <Button variant="quiet" onClick={onClose} disabled={!!busy}>
               Close
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : (
