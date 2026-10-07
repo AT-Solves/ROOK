@@ -1,0 +1,32 @@
+# Local stack: PostgreSQL + ROOK API with the synthetic demo tenant.
+# Usage: docker compose up --build   →  API on http://localhost:8000/docs
+# Real secrets go in backend/.env (never committed); see backend/.env.example.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rook
+      POSTGRES_PASSWORD: rook-local-only
+      POSTGRES_DB: rook
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rook"]
+      interval: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      ROOK_DATABASE_URL: postgresql+psycopg://rook:rook-local-only@db:5432/rook
+      ROOK_PUBLIC_API_URL: http://localhost:8000
+      ROOK_WEB_URL: http://localhost:3000
+    ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+
+volumes:
+  pgdata:

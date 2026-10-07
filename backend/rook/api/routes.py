@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -10,25 +11,42 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..ai.providers import provider_name
 from ..auth import current_user, issue_token, require_admin
-from ..config import settings
-from ..connectors import REGISTRY, ConnectorNotConfigured, SyncBatch, get_connector_class
+from ..config import settings, web_url
+from ..connectors import REGISTRY, ConnectorAuthError, ConnectorNotConfigured, SyncBatch, get_connector_class
 from ..connectors.base import NormalizedSignal
 from ..db import get_db
+from ..identity import IdentityError
+from ..identity import get_provider as get_identity_provider
+from ..identity import service as identity
 from ..models import (
-    ActionProposal, AuditLog, Commitment, Connector, Decision, Meeting, Organization, Person, Project, Risk, Signal, User, utcnow,
+    ActionProposal,
+    AuditLog,
+    Commitment,
+    Connector,
+    Decision,
+    Meeting,
+    Organization,
+    Person,
+    Project,
+    Risk,
+    Signal,
+    User,
+    utcnow,
 )
 from ..services import actions as action_svc
 from ..services import ask as ask_svc
 from ..services import meetings as meeting_svc
 from ..services.briefing import build_brief
-from ..services.pipeline import ingest, sync_connector
+from ..services.pipeline import ingest, relink_projects, sync_connector
 from ..services.views import Viewer, iso, signal_ref
+from ..timeutil import is_valid_tz
 
 router = APIRouter(prefix="/api")
 
 
 def _user_dict(u: User) -> dict:
-    return {"id": u.id, "email": u.email, "name": u.name, "title": u.title, "role": u.role, "org_id": u.org_id}
+    return {"id": u.id, "email": u.email, "name": u.name, "title": u.title, "role": u.role, "org_id": u.org_id,
+            "timezone": u.timezone}
 
 
 def _owned(db: Session, model, id_: int, user: User):
@@ -61,10 +79,60 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
     return {"token": issue_token(user), "user": _user_dict(user)}
 
 
+@router.get("/auth/providers")
+def auth_providers():
+    p = get_identity_provider("microsoft")
+    return {"providers": [{"id": p.id, "name": p.display_name, "configured": p.configured(),
+                           "login_url": "/api/auth/microsoft/login"}],
+            "dev_login": settings.dev_login}
+
+
+@router.get("/auth/{provider_id}/login")
+def auth_login(provider_id: str, return_to: str = "/", db: Session = Depends(get_db)):
+    try:
+        return RedirectResponse(identity.start(db, provider_id, "signin", return_to=return_to), status_code=302)
+    except IdentityError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@router.get("/auth/{provider_id}/callback")
+def auth_callback(provider_id: str, code: str | None = None, state: str | None = None, error: str | None = None,
+                  db: Session = Depends(get_db)):
+    """OAuth redirect target for both sign-in and connecting a data source. Tokens never appear in URLs except
+    ROOK's own session token, which is passed in the fragment (not sent to servers or logged)."""
+    from urllib.parse import quote
+
+    if error or not code or not state:
+        return RedirectResponse(f"{web_url()}/login?error={quote(error or 'missing_code')}", status_code=302)
+    try:
+        result = identity.callback(db, provider_id, code, state)
+    except IdentityError as exc:
+        return RedirectResponse(f"{web_url()}/login?error={quote(str(exc))}", status_code=302)
+    if result.purpose == "connect":
+        return RedirectResponse(f"{web_url()}/sources?connected={result.connector.kind}&id={result.connector.id}",
+                                status_code=302)
+    token = issue_token(result.user)
+    return RedirectResponse(f"{web_url()}/auth/complete#token={token}&return_to={quote(result.return_to)}", status_code=302)
+
+
 @router.get("/me")
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     org = db.get(Organization, user.org_id)
     return {"user": _user_dict(user), "org": {"id": org.id, "name": org.name}, "llm": provider_name()}
+
+
+class MeIn(BaseModel):
+    timezone: str | None = None
+
+
+@router.patch("/me")
+def update_me(body: MeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if body.timezone is not None:
+        if not is_valid_tz(body.timezone):
+            raise HTTPException(422, "timezone must be an IANA name such as Europe/London")
+        user.timezone = body.timezone
+    db.commit()
+    return _user_dict(user)
 
 
 # ---------------------------------------------------------------- brief / ask
@@ -213,6 +281,7 @@ def complete_commitment(cid: int, user: User = Depends(current_user), db: Sessio
 
 class FollowupIn(BaseModel):
     tone: str = "executive"
+    risk_id: int | None = None
 
 
 @router.post("/commitments/{cid}/followup")
@@ -220,7 +289,8 @@ def followup(cid: int, body: FollowupIn, user: User = Depends(current_user), db:
     if body.tone not in action_svc.TONES:
         raise HTTPException(422, f"tone must be one of {action_svc.TONES}")
     c = _visible_commitment(db, user, cid)
-    return _proposal(action_svc.draft_followup(db, user, c, body.tone))
+    risk = _owned(db, Risk, body.risk_id, user) if body.risk_id else None
+    return _proposal(action_svc.draft_followup(db, user, c, body.tone, risk))
 
 
 @router.get("/risks")
@@ -254,6 +324,29 @@ def projects(user: User = Depends(current_user), db: Session = Depends(get_db)):
                     "open_commitments": len([c for c in d["commitments"] if c["status"] in {"open", "overdue", "proposed"}]),
                     "last_activity": d["timeline"][-1]["occurred_at"] if d["timeline"] else None})
     return out
+
+
+class ProjectIn(BaseModel):
+    name: str = Field(min_length=2, max_length=200)
+    aliases: list[str] = []
+    owner: str = ""
+    summary: str = ""
+
+
+@router.post("/projects")
+def create_project(body: ProjectIn, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Projects are ROOK concepts (not a Microsoft one): admins define names/aliases used for linking (ADR-0003)."""
+    if db.scalar(select(Project).where(Project.org_id == user.org_id, Project.name == body.name)):
+        raise HTTPException(409, "A project with this name already exists")
+    p = Project(org_id=user.org_id, name=body.name, aliases=[a.strip().lower() for a in body.aliases if a.strip()],
+                owner=body.owner, summary=body.summary)
+    db.add(p)
+    db.flush()
+    linked = relink_projects(db, user.org_id)
+    audit.record(db, org_id=user.org_id, user_id=user.id, actor=f"user:{user.email}", action="project.created",
+                 input={"name": p.name, "aliases": p.aliases}, authorization="admin", result=f"linked {linked} item(s)")
+    db.commit()
+    return {"id": p.id, "name": p.name, "aliases": p.aliases, "linked": linked}
 
 
 @router.get("/projects/{pid}")
@@ -293,14 +386,15 @@ def signal(sid: int, user: User = Depends(current_user), db: Session = Depends(g
 
 @router.get("/sources")
 def sources(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    connected = {c.kind: c for c in db.scalars(select(Connector).where(Connector.org_id == user.org_id)).all()}
+    rows = db.scalars(select(Connector).where(Connector.org_id == user.org_id)).all()
     catalog = []
     for kind, cls in REGISTRY.items():
-        c = connected.get(kind)
+        # Delegated connectors are per user: show the caller's own connection only.
+        c = next((r for r in rows if r.kind == kind and (not cls.delegated or r.created_by == user.id)), None)
         catalog.append({
             "kind": kind, "name": cls.display_name, "category": cls.category, "phase": cls.phase,
-            "credentials_present": cls.is_configured(), "required_env": list(cls.required_env), "scopes": list(cls.scopes),
-            "can_send": cls.can_send,
+            "delegated": cls.delegated, "credentials_present": cls.is_configured(), "required_env": list(cls.required_env),
+            "scopes": list(cls.scopes), "sending_enabled": cls.sending_enabled(),
             "connection": {"id": c.id, "status": c.status, "last_synced_at": iso(c.last_synced_at)} if c else None,
         })
     return sorted(catalog, key=lambda x: (x["phase"], x["name"]))
@@ -315,7 +409,9 @@ def connect_source(body: ConnectIn, user: User = Depends(require_admin), db: Ses
     try:
         cls = get_connector_class(body.kind)
     except KeyError:
-        raise HTTPException(404, "Unknown connector")
+        raise HTTPException(404, "Unknown connector") from None
+    if cls.delegated:
+        raise HTTPException(400, f"{cls.display_name} is connected by each user: POST /api/sources/{cls.kind}/connect")
     conn = db.scalar(select(Connector).where(Connector.org_id == user.org_id, Connector.kind == body.kind))
     if conn is None:
         conn = Connector(org_id=user.org_id, kind=body.kind, created_by=user.id,
@@ -328,14 +424,41 @@ def connect_source(body: ConnectIn, user: User = Depends(require_admin), db: Ses
     return {"id": conn.id, "status": conn.status}
 
 
+@router.post("/sources/{kind}/connect")
+def connect_delegated(kind: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Start the user's OAuth consent for a delegated source. The client navigates to the returned URL."""
+    provider_id = next((p for p, k in identity.CONNECTOR_FOR_PROVIDER.items() if k == kind), None)
+    if provider_id is None:
+        raise HTTPException(404, "This source is not connected through OAuth")
+    try:
+        return {"authorization_url": identity.start(db, provider_id, "connect", user=user, return_to="/sources")}
+    except IdentityError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+def _my_connector(db: Session, user: User, cid: int) -> Connector:
+    conn = _owned(db, Connector, cid, user)
+    if get_connector_class(conn.kind).delegated and conn.created_by != user.id:
+        raise HTTPException(404, "Not found")  # a user's mailbox connection is theirs alone
+    return conn
+
+
 @router.post("/sources/{cid}/sync")
 def sync_source(cid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    conn = _owned(db, Connector, cid, user)
+    conn = _my_connector(db, user, cid)
     try:
         report = sync_connector(db, conn, actor=f"user:{user.email}")
-    except ConnectorNotConfigured as exc:
-        raise HTTPException(409, str(exc))
+    except (ConnectorNotConfigured, ConnectorAuthError) as exc:
+        raise HTTPException(409, {"message": str(exc), "action_required": True,
+                                  "partial_data": "Previously synced information remains available."}) from exc
     return report.__dict__
+
+
+@router.post("/sources/{cid}/disconnect")
+def disconnect_source(cid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    conn = _my_connector(db, user, cid)
+    identity.disconnect(db, user, conn)
+    return {"id": conn.id, "status": conn.status}
 
 
 # ---------------------------------------------------------------- actions (human in the loop)
@@ -379,7 +502,7 @@ def approve_action(aid: int, user: User = Depends(current_user), db: Session = D
     try:
         return _proposal(action_svc.approve(db, user, _my_action(db, user, aid)))
     except action_svc.PolicyError as exc:
-        raise HTTPException(409, str(exc))
+        raise HTTPException(409, str(exc)) from exc
 
 
 @router.post("/actions/{aid}/reject")
@@ -400,6 +523,8 @@ def get_policy(user: User = Depends(current_user), db: Session = Depends(get_db)
 def put_policy(body: dict[str, str], user: User = Depends(require_admin), db: Session = Depends(get_db)):
     if any(v not in POLICY_VALUES for v in body.values()):
         raise HTTPException(422, f"values must be one of {sorted(POLICY_VALUES)}")
+    if any(body.get(k) == "auto" for k in action_svc.EXTERNAL_COMMUNICATION):
+        raise HTTPException(422, "External communication always requires explicit approval in the MVP (ADR-0005)")
     org = db.get(Organization, user.org_id)
     org.ai_policy = (org.ai_policy or {}) | body
     audit.record(db, org_id=org.id, user_id=user.id, actor=f"user:{user.email}", action="policy.updated",

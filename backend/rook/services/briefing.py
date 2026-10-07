@@ -8,6 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Commitment, Decision, Evidence, Person, Risk, Signal, User, utcnow
+from ..timeutil import local_day_bounds_utc, to_local
+from ..trust import FACT, INFERENCE, RECOMMENDATION
 from .meetings import prep_reasons, visible_meetings
 from .views import Viewer, iso, signal_ref
 
@@ -51,7 +53,9 @@ def _people_attention(db: Session, v: Viewer, now: datetime, open_commitments: l
 
 def build_brief(db: Session, user: User, now: datetime | None = None) -> dict:
     now = now or utcnow()
-    today = now.date()
+    local_now = to_local(now, user.timezone)
+    today = local_now.date()
+    day_start, day_end = local_day_bounds_utc(now, user.timezone)
     v = Viewer(db, user)
     org = user.org_id
 
@@ -66,32 +70,45 @@ def build_brief(db: Session, user: User, now: datetime | None = None) -> dict:
     proposed = [c for c in commitments if c.status == "proposed"]
     open_c = [c for c in commitments if c.status == "open"]
 
-    day_start = datetime.combine(today, datetime.min.time())
-    meetings_today = [m for m in visible_meetings(db, user) if day_start <= m.starts_at < max(now + timedelta(hours=12), day_start + timedelta(days=1))]
+    meetings_today = [m for m in visible_meetings(db, user) if day_start <= m.starts_at < max(now + timedelta(hours=12), day_end)]
     today_items = []
     for m in meetings_today:
         reasons = prep_reasons(db, v, m)
         today_items.append(v.meeting(m) | {"prep_required": bool(reasons), "prep_reasons": reasons,
                                             "past": m.ends_at < now})
 
+    # Needs Attention: every item states what it is (claim type), why, evidence, and a suggested next step.
     attention: list[dict] = []
     for r in risks:
         if r.level == "high":
+            rv = v.risk(r)
             attention.append({"type": "risk", "label": "Risk detected", "title": r.title, "level": r.level,
-                              "confidence": r.confidence, "id": r.id, "why": r.explanation})
+                              "confidence": r.confidence, "id": r.id, "why": r.explanation, "claim_type": rv["claim_type"],
+                              "evidence": rv["evidence"], "recommended_action": rv["recommended_action"]})
     for d in pending:
         if v.is_me(d.owner):
+            dv = v.decision(d)
             attention.append({"type": "decision", "label": "Decision required", "title": d.statement, "level": "high",
-                              "confidence": d.confidence, "id": d.id, "why": f"{d.code} is waiting for you."})
+                              "confidence": d.confidence, "id": d.id, "why": f"{d.code} is waiting for you. {dv['basis']}.",
+                              "claim_type": dv["claim_type"], "evidence": dv["evidence"],
+                              "recommended_action": {"text": f"Decide: {d.statement}", "claim_type": RECOMMENDATION,
+                                                     "action": {"type": "decide", "decision_id": d.id}}})
     for c in waiting:
         if c.due_date and c.due_date < today:
+            cv = v.commitment(c, today)
             attention.append({"type": "commitment", "label": "Follow-up overdue", "title": f"{c.owner_name}: {c.description}",
                               "level": "medium", "confidence": c.confidence, "id": c.id,
-                              "why": f"Due {c.due_date:%b} {c.due_date.day}; no completion detected. A reminder can be drafted for your approval."})
+                              "why": f"Due {c.due_date:%b} {c.due_date.day}. {cv['status_basis']}",
+                              "claim_type": INFERENCE, "evidence": cv["evidence"],
+                              "recommended_action": {"text": f"Follow up with {c.owner_name.split()[0]}; ROOK can draft it for your approval.",
+                                                     "claim_type": RECOMMENDATION,
+                                                     "action": {"type": "draft_followup", "commitment_id": c.id}}})
     for c in mine:
         if c.due_date and c.due_date <= today + timedelta(days=2):
+            cv = v.commitment(c, today)
             attention.append({"type": "commitment", "label": "Your commitment", "title": c.description, "level": "medium",
-                              "confidence": c.confidence, "id": c.id, "why": f"You committed to this; due {c.due_date:%b} {c.due_date.day}."})
+                              "confidence": c.confidence, "id": c.id, "why": f"You committed to this; due {c.due_date:%b} {c.due_date.day}.",
+                              "claim_type": cv["claim_type"], "evidence": cv["evidence"], "recommended_action": None})
     attention.sort(key=lambda a: LEVEL_ORDER[a["level"]])
 
     # Changes in the last 36h, described by what ROOK derived from each signal.
@@ -103,7 +120,9 @@ def build_brief(db: Session, user: User, now: datetime | None = None) -> dict:
             continue
         derived = db.scalars(select(Evidence).where(Evidence.org_id == org, Evidence.signal_id == s.id)).all()
         notes = sorted({f"{e.entity_type}{' (' + e.note + ')' if e.note else ''}" for e in derived})
-        changes.append(signal_ref(s) | {"derived": notes, "summary": s.body.split(". ")[0][:180]})
+        first = s.body.split(". ")[0].split("\n")[0][:180]
+        summary = f"{s.title} \u2014 {first}" if s.kind == "task_update" else first
+        changes.append(signal_ref(s) | {"derived": notes, "summary": summary, "claim_type": FACT})
 
     prep = [m for m in today_items if m["prep_required"] and not m["past"]]
     top = attention[:3]
@@ -114,8 +133,9 @@ def build_brief(db: Session, user: User, now: datetime | None = None) -> dict:
 
     first = user.name.split()[0]
     return {
-        "greeting": f"{_greeting(now)}, {first}",
-        "date": f"{now:%A}, {now:%B} {now.day}",
+        "greeting": f"{_greeting(local_now)}, {first}",
+        "date": f"{local_now:%A}, {local_now:%B} {local_now.day}",
+        "timezone": user.timezone,
         "generated_at": iso(now),
         "headline": headline,
         "counts": {

@@ -13,7 +13,14 @@ from sqlalchemy.orm import Session
 
 from .. import audit
 from ..ai.extraction import Extraction, get_extractor
-from ..connectors import ConnectorNotConfigured, SyncBatch, get_connector_class
+from ..connectors import (
+    BaseConnector,
+    ConnectorAuthError,
+    ConnectorContext,
+    ConnectorNotConfigured,
+    SyncBatch,
+    get_connector_class,
+)
 from ..models import (
     Commitment,
     Connector,
@@ -43,19 +50,34 @@ class SyncReport:
     risks_open: int = 0
     engine: str = "rules"
     events: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+def connector_instance(db: Session, connector: Connector) -> BaseConnector:
+    """Instantiate a connector with its runtime context (owner, delegated token access)."""
+    cls = get_connector_class(connector.kind)
+    ctx = ConnectorContext()
+    if cls.delegated:
+        owner = db.get(User, connector.created_by) if connector.created_by else None
+        ctx.owner_email = owner.email if owner else ""
+        from ..identity.service import access_token_getter
+
+        ctx.get_access_token = access_token_getter(db, connector)
+    return cls(connector.config, ctx)
 
 
 def sync_connector(db: Session, connector: Connector, actor: str = "system") -> SyncReport:
-    cls = get_connector_class(connector.kind)
+    instance = connector_instance(db, connector)
     try:
-        batch = cls(connector.config).sync(connector.last_synced_at)
-    except ConnectorNotConfigured as exc:
-        connector.status = "needs_configuration"
+        batch = instance.sync(connector.last_synced_at)
+    except (ConnectorNotConfigured, ConnectorAuthError) as exc:
+        connector.status = "needs_reauth" if isinstance(exc, ConnectorAuthError) else "needs_configuration"
         audit.record(db, org_id=connector.org_id, actor=actor, action="connector.sync_failed",
                      tool=connector.kind, result=str(exc))
         db.commit()
         raise
     report = ingest(db, connector, batch)
+    report.warnings = list(instance.context.warnings)
     connector.last_synced_at = utcnow()
     connector.status = "connected"
     audit.record(db, org_id=connector.org_id, actor=actor, action="connector.synced", tool=connector.kind,
@@ -181,7 +203,8 @@ def _persist(db: Session, signal: Signal, result: Extraction, report: SyncReport
         row = Decision(org_id=org_id, code=_next_decision_code(db, org_id), statement=d.statement,
                        owner=owner.name if owner else d.owner, rationale=d.rationale, status=status,
                        confidence=d.confidence, decided_at=signal.occurred_at, project_id=pid,
-                       meeting_id=signal.meeting_id, source_signal_id=signal.id, needs_user=d.pending)
+                       meeting_id=signal.meeting_id, source_signal_id=signal.id, needs_user=d.pending,
+                       participants=list(signal.participants or []))
         db.add(row)
         db.flush()
         _add_evidence(db, signal, "decision", row.id, d.quote)
@@ -213,6 +236,7 @@ def _persist(db: Session, signal: Signal, result: Extraction, report: SyncReport
                          created_at=signal.occurred_at)
         db.add(row)
         db.flush()
+        _link_decision(db, row, signal)
         _add_evidence(db, signal, "commitment", row.id, c.quote)
         report.commitments_new += 1
         report.events.append(f"COMMITMENT_CREATED {row.id}")
@@ -234,14 +258,59 @@ def _persist(db: Session, signal: Signal, result: Extraction, report: SyncReport
                          result=best.description)
 
 
+DECISION_LINK_WINDOW_DAYS = 14
+
+
+def _link_decision(db: Session, c: Commitment, signal: Signal) -> None:
+    """Commitment -> related decision (MVP Commitment Register).
+
+    FACT when stated in the same source as the decision; INFERENCE when it is the only decision made on
+    the same project within the preceding window. Ambiguity (several candidates) means no link.
+    """
+    if c.project_id is None:
+        return
+    made = db.scalars(select(Decision).where(
+        Decision.org_id == c.org_id, Decision.project_id == c.project_id, Decision.status == "made",
+        Decision.decided_at <= signal.occurred_at)).all()
+    same = [d for d in made if d.source_signal_id == signal.id]
+    if len(same) == 1:
+        c.decision_id, c.decision_link_type = same[0].id, "fact"
+        c.decision_link_basis = f"Committed in the same discussion where {same[0].code} was decided."
+        return
+    recent = [d for d in made if (signal.occurred_at - d.decided_at).days <= DECISION_LINK_WINDOW_DAYS]
+    if len(recent) == 1:
+        d = recent[0]
+        c.decision_id, c.decision_link_type = d.id, "inference"
+        c.decision_link_basis = (f"Same project as {d.code}, decided "
+                                 f"{(signal.occurred_at - d.decided_at).days} day(s) earlier.")
+
+
 def sync_all(db: Session, org_id: int, actor: str = "system") -> list[SyncReport]:
     reports = []
     for c in db.scalars(select(Connector).where(Connector.org_id == org_id)).all():
         try:
             reports.append(sync_connector(db, c, actor))
-        except ConnectorNotConfigured:
+        except (ConnectorNotConfigured, ConnectorAuthError):
             continue
     return reports
+
+
+def relink_projects(db: Session, org_id: int) -> int:
+    """After an admin adds or edits a project: link unlinked signals and items, then re-run risk detection."""
+    projects = db.scalars(select(Project).where(Project.org_id == org_id)).all()
+    changed = 0
+    for s in db.scalars(select(Signal).where(Signal.org_id == org_id, Signal.project_id.is_(None))).all():
+        if pid := link_project(projects, f"{s.title}\n{s.body}"):
+            s.project_id, changed = pid, changed + 1
+    for model in (Decision, Commitment):
+        for row in db.scalars(select(model).where(model.org_id == org_id, model.project_id.is_(None))).all():
+            quotes = db.scalars(select(Evidence.quote).where(Evidence.entity_type == model.__tablename__[:-1],
+                                                             Evidence.entity_id == row.id)).all()
+            if pid := link_project(projects, " ".join(quotes)) or (db.get(Signal, row.source_signal_id).project_id):
+                row.project_id, changed = pid, changed + 1
+    risk.detect(db, org_id)
+    db.commit()
+    return changed
 
 
 def connect_demo(db: Session, org_id: int, user: User | None = None) -> Connector:

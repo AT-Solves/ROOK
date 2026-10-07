@@ -7,7 +7,7 @@ derived entity (decision, commitment, risk, ...) back to the source signals it c
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -16,7 +16,7 @@ from .db import Base
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Organization(Base):
@@ -24,6 +24,8 @@ class Organization(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str] = mapped_column(String(100), unique=True)
+    # Identity-provider tenant this org maps to, e.g. "entra:<tenant-id>" (ADR-0004). Provider-neutral string.
+    external_ref: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
     # AI action policy (§19, §53). Keys: create_task, send_email, send_message -> "never" | "approval" | "auto"
     ai_policy: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -38,6 +40,9 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(200))
     title: Mapped[str] = mapped_column(String(200), default="")
     role: Mapped[str] = mapped_column(String(20), default="member")  # admin | member
+    timezone: Mapped[str] = mapped_column(String(64), default="UTC")  # IANA name; "today" is computed in it
+    # Stable subject at the identity provider, e.g. "entra:<oid>" (never the email, which can change).
+    external_subject: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
 
 
 class Person(Base):
@@ -131,6 +136,7 @@ class Decision(Base):
     project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True)
     meeting_id: Mapped[int | None] = mapped_column(ForeignKey("meetings.id"), nullable=True)
     source_signal_id: Mapped[int] = mapped_column(ForeignKey("signals.id"))
+    participants: Mapped[list] = mapped_column(JSON, default=list)  # emails present when it was decided
     needs_user: Mapped[bool] = mapped_column(Boolean, default=False)  # pending decision awaiting the leader
 
 
@@ -147,6 +153,10 @@ class Commitment(Base):
     confidence: Mapped[str] = mapped_column(String(10), default="medium")
     project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True)
     source_signal_id: Mapped[int] = mapped_column(ForeignKey("signals.id"))
+    # Related decision (MVP Commitment Register) and why ROOK linked them.
+    decision_id: Mapped[int | None] = mapped_column(ForeignKey("decisions.id"), nullable=True)
+    decision_link_basis: Mapped[str] = mapped_column(String(300), default="")
+    decision_link_type: Mapped[str] = mapped_column(String(20), default="")  # fact | inference
     completed_signal_id: Mapped[int | None] = mapped_column(ForeignKey("signals.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -164,6 +174,10 @@ class Risk(Base):
     confidence: Mapped[str] = mapped_column(String(10), default="medium")
     status: Mapped[str] = mapped_column(String(20), default="open")  # open | acknowledged | resolved
     project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    # Recommended next step (MVP Risk Radar) — always a RECOMMENDATION, never executed automatically.
+    recommendation: Mapped[str] = mapped_column(Text, default="")
+    action: Mapped[dict] = mapped_column(JSON, default=dict)  # e.g. {"type": "draft_followup", "commitment_id": 3}
+    related: Mapped[dict] = mapped_column(JSON, default=dict)  # {"commitments": [...], "decisions": [...]}
     detected_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -213,3 +227,33 @@ class AuditLog(Base):
     authorization: Mapped[str] = mapped_column(String(60), default="")
     result: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class AuthState(Base):
+    """Single-use, short-lived OAuth/OIDC login state (state, nonce, PKCE verifier) — ADR-0004."""
+
+    __tablename__ = "auth_states"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    state: Mapped[str] = mapped_column(String(100), unique=True)
+    nonce: Mapped[str] = mapped_column(String(100))
+    code_verifier: Mapped[str] = mapped_column(String(200))
+    provider: Mapped[str] = mapped_column(String(40))
+    purpose: Mapped[str] = mapped_column(String(20))  # signin | connect
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    return_to: Mapped[str] = mapped_column(String(300), default="/")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ConnectorCredential(Base):
+    """Delegated OAuth tokens for a connector, encrypted at rest (rook-security §7)."""
+
+    __tablename__ = "connector_credentials"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    connector_id: Mapped[int] = mapped_column(ForeignKey("connectors.id"), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    refresh_token_enc: Mapped[str] = mapped_column(Text, default="")
+    access_token_enc: Mapped[str] = mapped_column(Text, default="")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    scopes: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

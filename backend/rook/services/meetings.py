@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Commitment, Decision, Meeting, Person, Risk, Signal, User, utcnow
+from ..trust import FACT, RECOMMENDATION, claim
 from .text import overlap
 from .views import Viewer, signal_ref
 
@@ -61,7 +62,7 @@ def _lc(s: str) -> str:
     return s[:1].lower() + s[1:]
 
 
-def suggested_questions(v: Viewer, ctx: dict) -> list[str]:
+def suggested_questions(v: Viewer, ctx: dict) -> list[dict]:
     qs: list[str] = []
     made = [d for d in ctx["decisions"] if d.status == "made"]
     today = utcnow().date()
@@ -80,7 +81,8 @@ def suggested_questions(v: Viewer, ctx: dict) -> list[str]:
             qs.append(f"{c.owner_name.split()[0]}, are we still on track for “{c.description}”?")
         if c.status == "proposed":
             qs.append(f"Who should own: {_lc(c.description)}?")
-    return list(dict.fromkeys(qs))[:6]
+    return [claim(q, RECOMMENDATION, basis="Suggested from open risks, decisions and commitments for this meeting.")
+            for q in list(dict.fromkeys(qs))[:6]]
 
 
 def preparation(db: Session, user: User, m: Meeting) -> dict:
@@ -120,7 +122,7 @@ def post_meeting(db: Session, user: User, m: Meeting) -> dict:
         for line in s.body.splitlines():
             text = line.split(": ", 1)[-1].strip()
             if OPEN_QUESTION_RE.search(text):
-                questions.append({"text": text, "source": signal_ref(s, text)})
+                questions.append(claim(text, FACT, evidence=[signal_ref(s, text)], basis="Raised and left open in the meeting."))
     owners = {c.owner_email for c in commitments if c.owner_email}
     inform = [p for p in _people(db, user.org_id, sorted(owners)) if p["email"] not in m.attendees]
     return {

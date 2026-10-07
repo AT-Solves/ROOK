@@ -8,7 +8,12 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..ai.providers import LLMError, get_provider
 from ..connectors import OutboundMessage, get_connector_class
-from ..models import ActionProposal, Commitment, Connector, Organization, Signal, User, utcnow
+from ..models import ActionProposal, Commitment, Connector, Organization, Risk, Signal, User, utcnow
+from ..trust import RECOMMENDATION
+from .views import Viewer
+
+# External communication is human-controlled in the MVP (C-001, ADR-0005): these kinds can never be "auto".
+EXTERNAL_COMMUNICATION = {"send_email", "send_message"}
 
 TONES = ("executive", "concise", "diplomatic", "direct", "collaborative", "formal")
 
@@ -26,21 +31,34 @@ class PolicyError(Exception):
     pass
 
 
-def _template_reminder(user: User, c: Commitment, source: Signal, tone: str) -> str:
+def _template_reminder(user: User, c: Commitment, source: Signal, tone: str, risk: Risk | None = None) -> str:
     first = c.owner_name.split()[0]
-    due = f", which was due {c.due_date:%A %B} {c.due_date.day}" if c.due_date else ""
+    due = f" (due {c.due_date:%A %B} {c.due_date.day})" if c.due_date else ""
+    ask = ("Could you share where it stands and the expected date? If something is blocking it, let me know how I can help."
+           if risk is None or risk.rule != "dependency_delay" else
+           "I understand a dependency has slipped. Could you share a recovery plan and a confirmed date, "
+           "and let me know what you need from me to protect the plan?")
     return (
-        f"Hi {first},\n\n{_OPENERS.get(tone, _OPENERS['executive'])} “{c.description}”{due}. "
-        f"This came out of {source.title.split(' — ')[0]} on {source.occurred_at:%B} {source.occurred_at.day}.\n\n"
-        "Could you share where it stands and the expected date? If something is blocking it, let me know how I can help.\n\n"
-        f"Thanks,\n{user.name.split()[0]}"
+        f"Hi {first},\n\n{_OPENERS.get(tone, _OPENERS['executive'])} \u201c{c.description}\u201d{due}, "
+        f"which came out of {source.title.split(' — ')[0]} on {source.occurred_at:%B} {source.occurred_at.day}.\n\n"
+        f"{ask}\n\nThanks,\n{user.name.split()[0]}"
     )
 
 
-def draft_followup(db: Session, user: User, commitment: Commitment, tone: str = "executive") -> ActionProposal:
-    """Prepare (never send) a reminder. Sending is a separate, policy-gated approval step."""
+def draft_followup(db: Session, user: User, commitment: Commitment, tone: str = "executive",
+                   risk: Risk | None = None) -> ActionProposal:
+    """Prepare (never send) a follow-up. Sending is a separate step that needs the user's explicit approval."""
     source = db.get(Signal, commitment.source_signal_id)
-    body = _template_reminder(user, commitment, source, tone)
+    v = Viewer(db, user)
+    cv = v.commitment(commitment)
+    context = {"why": cv["status_basis"] or cv["basis"], "commitment": {k: cv[k] for k in ("id", "owner", "description", "due_date", "status")},
+               "evidence": cv["evidence"], "claim_type": RECOMMENDATION}
+    if risk is not None and v.visible(risk):
+        rv = v.risk(risk)
+        context["why"] = rv["explanation"]
+        context["risk"] = {"id": rv["id"], "title": rv["title"], "level": rv["level"]}
+        context["evidence"] = rv["evidence"]
+    body = _template_reminder(user, commitment, source, tone, risk)
     engine = "template"
     if provider := get_provider():
         try:
@@ -55,7 +73,7 @@ def draft_followup(db: Session, user: User, commitment: Commitment, tone: str = 
         org_id=user.org_id, user_id=user.id, kind="send_email",
         title=f"Follow up with {commitment.owner_name}",
         payload={"to": [commitment.owner_email] if commitment.owner_email else [], "subject": f"Follow-up: {commitment.description}",
-                 "body": body, "tone": tone, "engine": engine},
+                 "body": body, "tone": tone, "engine": engine, "context": context},
         related_type="commitment", related_id=commitment.id)
     db.add(proposal)
     db.flush()
@@ -78,17 +96,25 @@ def approve(db: Session, user: User, proposal: ActionProposal) -> ActionProposal
                      tool=proposal.kind, input={"proposal_id": proposal.id}, authorization=f"policy:{rule}", result=proposal.result)
         db.commit()
         return proposal
+    if proposal.kind in EXTERNAL_COMMUNICATION and proposal.user_id != user.id:
+        raise PolicyError("Only the person sending this message can approve it.")
     if proposal.user_id != user.id and user.role != "admin":
         raise PolicyError("Only the requesting user or an admin can approve this action.")
 
     proposal.status = "approved"
+    # Send only through a connector that belongs to the approving user (their own mailbox) and allows sending.
     sender = next((c for c in db.scalars(select(Connector).where(Connector.org_id == user.org_id)).all()
-                   if get_connector_class(c.kind).can_send and c.status == "connected"), None)
-    if sender is None:
-        proposal.result = "Approved. No connected source can send messages yet; copy the draft and send it yourself."
+                   if c.status == "connected" and get_connector_class(c.kind).sending_enabled()
+                   and (c.created_by in (None, user.id) if c.kind == "demo" else c.created_by == user.id)), None)
+    p = proposal.payload
+    if not p.get("to"):
+        proposal.result = "Approved, but the recipient's address is unknown. Copy the draft and send it yourself."
+    elif sender is None:
+        proposal.result = "Approved. No connected source is allowed to send for you; copy the draft and send it yourself."
     else:
-        p = proposal.payload
-        proposal.result = get_connector_class(sender.kind)(sender.config).send(
+        from .pipeline import connector_instance
+
+        proposal.result = connector_instance(db, sender).send(
             OutboundMessage(to=p.get("to", []), subject=p.get("subject", ""), body=p.get("body", "")))
         proposal.status = "executed"
     proposal.updated_at = utcnow()

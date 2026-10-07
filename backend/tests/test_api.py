@@ -89,3 +89,28 @@ def test_signal_access_check(client):
     h = login(client)
     restricted = [s for s in range(1, 30) if client.get(f"/api/signals/{s}", headers=h).status_code == 403]
     assert restricted, "the restricted compensation email must be refused"
+
+
+def test_only_the_sender_can_approve_external_communication(client):
+    marcus, yamini = login(client, "marcus@acme.example"), login(client)
+    c = client.get("/api/commitments?scope=waiting", headers=marcus).json()[0]
+    draft = client.post(f"/api/commitments/{c['id']}/followup", json={}, headers=marcus).json()
+    r = client.post(f"/api/actions/{draft['id']}/approve", headers=yamini)  # an admin, but not the sender
+    assert r.status_code == 409 and "person sending" in r.json()["detail"]
+
+
+def test_request_logs_exclude_query_strings_and_content(client, caplog):
+    import json
+    import logging
+
+    from rook.logging import JsonFormatter
+
+    with caplog.at_level(logging.INFO, logger="rook.http"):
+        client.get("/api/auth/microsoft/callback?code=SECRET-CODE&state=x", follow_redirects=False)
+    lines = [JsonFormatter().format(r) for r in caplog.records if r.name == "rook.http"]
+    assert lines and all("SECRET-CODE" not in line for line in lines)
+    assert json.loads(lines[-1])["path"] == "/api/auth/microsoft/callback"
+
+
+def test_health(client):
+    assert client.get("/api/health").json() == {"ok": True, "llm": "rules"}

@@ -8,6 +8,7 @@ connectors can be added independently without touching the pipeline.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable  # noqa: F401  (used in a string annotation)
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -75,6 +76,24 @@ class ConnectorNotConfigured(Exception):
     """Raised when a connector needs credentials/OAuth that have not been provided."""
 
 
+class ConnectorAuthError(Exception):
+    """Raised when stored credentials are missing, expired or revoked — the user must reconnect."""
+
+
+@dataclass
+class ConnectorContext:
+    """What the platform gives a connector at runtime, without exposing the domain model.
+
+    ``get_access_token`` returns a valid delegated access token (refreshing it if needed);
+    ``owner_email`` is the user on whose behalf a delegated connector syncs.
+    """
+
+    owner_email: str = ""
+    get_access_token: Callable[[], str] | None = None
+    lookback_days: int = 14
+    warnings: list[str] = field(default_factory=list)
+
+
 class BaseConnector(ABC):
     kind: str
     display_name: str
@@ -83,9 +102,15 @@ class BaseConnector(ABC):
     required_env: tuple[str, ...] = ()
     scopes: tuple[str, ...] = ()
     can_send: bool = False
+    delegated: bool = False  # True: one connection per user, synced with that user's own access
 
-    def __init__(self, config: dict | None = None):
+    def __init__(self, config: dict | None = None, context: ConnectorContext | None = None):
         self.config = config or {}
+        self.context = context or ConnectorContext()
+
+    @classmethod
+    def sending_enabled(cls) -> bool:
+        return cls.can_send
 
     @classmethod
     def is_configured(cls) -> bool:

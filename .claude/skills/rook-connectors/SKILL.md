@@ -18,6 +18,14 @@ Implement `BaseConnector` (`connectors/base.py`):
 plus class metadata (`kind`, `display_name`, `category`, `phase`, `required_env`, `scopes`,
 `can_send`). Register the connector in `connectors/__init__.py::REGISTRY`.
 
+## Current implementation
+- `connectors/microsoft/`: the P0 email, calendar and meeting connector (Outlook, Calendar, Teams transcripts)
+  over Microsoft Graph with delegated per-user OAuth (ADR-0003). Setup is in `docs/integrations/microsoft365.md`.
+  Tests are in `tests/test_microsoft365.py`, with the mocked tenant in `tests/fixtures/m365.py`.
+- `connectors/demo*.py`: the synthetic demo tenant and manual transcript upload.
+- Delegated connectors set `delegated = True`, receive a `ConnectorContext` (owner email, token getter) and must
+  never see another user's tokens. Tokens are handled by `identity/service.py`, not the connector.
+
 ## Responsibilities
 - **Sequencing per MVP scope** (this overrides README §37 Phase 1 where they differ):
   P0 = one email source, one calendar source, and a meeting or conversation ingestion path (the
@@ -42,7 +50,7 @@ plus class metadata (`kind`, `display_name`, `category`, `phase`, `required_env`
 - Never hard-code to Microsoft Teams. ROOK stays channel-agnostic (README §5).
 
 ## Inputs
-Vendor API docs, OAuth app credentials (supplied by the user or admin), scope decisions from rook-security.
+Vendor API docs, OAuth app credentials (configured by the owner as environment variables, never in chat or code), scope decisions from rook-security.
 
 ## Outputs
 A connector class, a fixture-based test suite (recorded or synthetic API responses, no live

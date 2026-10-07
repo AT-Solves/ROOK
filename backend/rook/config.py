@@ -49,9 +49,30 @@ class Settings:
     ollama_url: str = field(default_factory=lambda: os.environ.get("ROOK_OLLAMA_URL", "http://localhost:11434"))
     ollama_model: str = field(default_factory=lambda: os.environ.get("ROOK_OLLAMA_MODEL", "llama3.1"))
 
-    google_client_id: str = field(default_factory=lambda: os.environ.get("ROOK_GOOGLE_CLIENT_ID", ""))
-    microsoft_client_id: str = field(default_factory=lambda: os.environ.get("ROOK_MICROSOFT_CLIENT_ID", ""))
-    slack_client_id: str = field(default_factory=lambda: os.environ.get("ROOK_SLACK_CLIENT_ID", ""))
 
 
 settings = Settings()
+
+
+# --- Values read at call time (so deployments and tests can change them without re-import) ---------
+
+def env(name: str, default: str = "") -> str:
+    return os.environ.get(name, default).strip()
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    return _bool(name, default)
+
+
+def public_api_url() -> str:
+    """Externally reachable base URL of this API (used for OAuth redirect URIs)."""
+    return env("ROOK_PUBLIC_API_URL", "http://localhost:8000").rstrip("/")
+
+
+def web_url() -> str:
+    """Base URL of the ROOK web app (where users land after sign-in / connect)."""
+    return env("ROOK_WEB_URL", "http://localhost:3000").rstrip("/")
+
+
+def admin_emails() -> set[str]:
+    return {e.strip().lower() for e in env("ROOK_ADMIN_EMAILS").split(",") if e.strip()}

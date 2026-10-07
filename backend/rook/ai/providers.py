@@ -82,7 +82,10 @@ class OpenAIProvider(LLMProvider):
 
 
 class OllamaProvider(LLMProvider):
-    """Self-hosted models for data-sovereign deployments (§36)."""
+    """EXPERIMENTAL / UNSUPPORTED (C-004): self-hosted models are a P2 capability.
+
+    Kept only to prove the provider abstraction; no production self-hosted inference is supported in the MVP.
+    """
 
     name = "ollama"
 

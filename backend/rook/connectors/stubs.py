@@ -1,4 +1,4 @@
-"""Phase 1–3 connectors (README §37) — registered so the UI and admin policy can see them.
+"""Not-yet-implemented connectors (README §37; sequencing per 02_MVP_SCOPE) — registered so the UI and admin policy can see them.
 
 Each one lists the credentials and OAuth scopes it needs. ``sync`` raises
 ``ConnectorNotConfigured`` until the real implementation and credentials are in place.
@@ -30,22 +30,13 @@ class GoogleCalendarConnector(_PendingConnector):
     scopes = ("https://www.googleapis.com/auth/calendar.readonly",)
 
 
-class OutlookConnector(_PendingConnector):
-    kind, display_name, category, phase = "outlook", "Microsoft Outlook", "communication", 1
-    required_env = ("ROOK_MICROSOFT_CLIENT_ID", "ROOK_MICROSOFT_CLIENT_SECRET", "ROOK_MICROSOFT_TENANT_ID")
-    scopes = ("Mail.Read", "Mail.Send", "offline_access")
 
 
-class MicrosoftCalendarConnector(_PendingConnector):
-    kind, display_name, category, phase = "microsoft_calendar", "Microsoft Calendar", "meetings", 1
-    required_env = ("ROOK_MICROSOFT_CLIENT_ID", "ROOK_MICROSOFT_CLIENT_SECRET", "ROOK_MICROSOFT_TENANT_ID")
-    scopes = ("Calendars.Read", "offline_access")
 
-
-class TeamsConnector(_PendingConnector):
-    kind, display_name, category, phase = "teams", "Microsoft Teams", "communication", 1
-    required_env = ("ROOK_MICROSOFT_CLIENT_ID", "ROOK_MICROSOFT_CLIENT_SECRET", "ROOK_MICROSOFT_TENANT_ID")
-    scopes = ("Chat.Read", "ChannelMessage.Read.All", "OnlineMeetingTranscript.Read.All", "offline_access")
+class SharePointConnector(_PendingConnector):
+    kind, display_name, category, phase = "sharepoint", "SharePoint / OneDrive", "documents", 2
+    required_env = ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT_ID")
+    scopes = ("Sites.Read.All", "Files.Read.All")
 
 
 class SlackConnector(_PendingConnector):
@@ -70,11 +61,6 @@ class GitHubConnector(_PendingConnector):
     kind, display_name, category, phase = "github", "GitHub", "work", 2
     required_env = ("ROOK_GITHUB_APP_ID", "ROOK_GITHUB_PRIVATE_KEY")
 
-
-class SharePointConnector(_PendingConnector):
-    kind, display_name, category, phase = "sharepoint", "SharePoint / OneDrive", "documents", 2
-    required_env = ("ROOK_MICROSOFT_CLIENT_ID", "ROOK_MICROSOFT_CLIENT_SECRET", "ROOK_MICROSOFT_TENANT_ID")
-    scopes = ("Sites.Read.All", "Files.Read.All")
 
 
 class ZoomConnector(_PendingConnector):

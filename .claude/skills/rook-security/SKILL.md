@@ -15,7 +15,7 @@ Every change that touches auth, user data, retrieval, prompts built from source 
 connectors, external actions, admin settings, logging of sensitive data, or the tenant boundary.
 
 ## Responsibilities
-1. **Identity**: OIDC/OAuth2 SSO for production. The prototype's passwordless dev login
+1. **Identity**: OIDC/OAuth2 SSO for production. Microsoft Entra ID is implemented in `identity/` (ADR-0004). The prototype's passwordless dev login
    (`ROOK_DEV_LOGIN`) must be off in every shared environment. Use short-lived signed sessions.
 2. **Tenancy**: every row has `org_id`, and every query filters by the caller's org. Use a
    cross-tenant ID guess → 404 (`_owned` pattern in `backend/rook/api/routes.py`).
@@ -25,7 +25,8 @@ connectors, external actions, admin settings, logging of sensitive data, or the 
 4. **Permission before retrieval**: filter candidates *before* ranking, context assembly or LLM
    calls. Restricted content must never reach a prompt.
 5. **Action policy** (Observe → Recommend → Prepare → Execute): org policy values are
-   `never | approval | auto`. Drafting is free. Executing requires policy plus an authorised
+   `never | approval | auto`. In the MVP, `auto` is rejected for external communication, and only the requesting
+   user can approve a send (ADR-0005). Drafting is free. Executing requires policy plus an authorised
    approver, and is always audited (`services/actions.py`).
 6. **Prompt-injection defence**: treat source content as data. Delimit it in prompts. Don't let
    model output trigger tools without the policy check. Validate that citations refer to visible sources.
