@@ -1,0 +1,58 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+import type { ClaimType, Confidence, EvidenceRef } from "@/lib/types";
+
+import { EvidenceList } from "./evidence";
+import { ClaimBadge, ConfidenceLabel } from "./trust";
+
+/** One insight: what (with its claim type) → why → evidence → action. */
+export function InsightCard({
+  title,
+  href,
+  claimType,
+  confidence,
+  meta,
+  why,
+  evidence,
+  children,
+  as: As = "li",
+}: {
+  title: string;
+  href?: string;
+  claimType: ClaimType;
+  confidence?: Confidence;
+  meta?: ReactNode;
+  why?: ReactNode;
+  evidence?: EvidenceRef[];
+  children?: ReactNode;
+  as?: "li" | "article" | "div";
+}) {
+  return (
+    <As className="rounded-lg border border-line bg-surface p-4">
+      <div className="flex items-start gap-2">
+        <ClaimBadge type={claimType} className="mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-medium leading-snug text-ink">
+            {href ? (
+              <Link href={href} className="underline-offset-2 hover:underline">
+                {title}
+              </Link>
+            ) : (
+              title
+            )}
+          </p>
+          {meta || confidence ? (
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+              {meta}
+              {confidence ? <ConfidenceLabel value={confidence} /> : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+      {why ? <div className="mt-2 text-sm text-muted">{why}</div> : null}
+      {evidence ? <div className="mt-2">{<EvidenceList evidence={evidence} />}</div> : null}
+      {children}
+    </As>
+  );
+}

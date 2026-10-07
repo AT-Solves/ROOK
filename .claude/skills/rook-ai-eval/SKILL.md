@@ -26,10 +26,17 @@ release, and whenever a user reports a wrong or unsupported insight.
 - **Epistemic labels** (PRD §7): every surfaced claim is one of `fact` (stated in a source),
   `inference` (evidence-backed), `recommendation`, or `unknown`. Confidence follows README §42:
   high = an explicit official source, medium = multiple signals, low = indirect.
+- **Decompose mixed answers (C-008, product owner 2026-10-07)**: "ROOK must decompose mixed answers into individually typed claims rather than assigning one weakest-confidence label to the entire response."
+  A composite answer has no answer-level `claim_type`. Instead it has ordered `units`:
+  FACT (what changed, cited) → INFERENCE (why it may matter, cited, with confidence) →
+  RECOMMENDATION (what to consider next) → UNKNOWN (what the evidence cannot establish, with no supporting
+  citations). `rook/trust.py::answer_violations` enforces this at runtime.
+  `backend/tests/test_eval_answers.py` validates every MVP question for two users, and includes negative cases.
 - **Regression gate**: CI runs evals in rules mode (deterministic). Run LLM-mode evals on demand
   or nightly with recorded results.
 
 ## Constraints
+- Never collapse mixed claim types into one label: not the weakest, not the strongest.
 - Never tune to the test set by special-casing scenario text. Add new scenarios instead.
 - An eval run that can't reach a model must report "skipped", not "passed".
 - Never ship a change that raises the restricted-leak rate or lowers groundedness.

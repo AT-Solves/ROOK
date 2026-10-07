@@ -4,18 +4,23 @@ Pipeline: permission-filtered retrieval -> structured context assembly -> (optio
 -> evidence validation. Every answer has the same structured shape:
 
     answer              direct answer (one or two sentences)
-    claim_type          FACT | INFERENCE | RECOMMENDATION | UNKNOWN for the direct answer
-    confidence          high | medium | low
+    claim_type          FACT | INFERENCE | RECOMMENDATION | UNKNOWN for a single-type answer;
+                        None for a composite answer (mixed claim types are never collapsed into one label)
+    confidence          high | medium | low (None for a composite answer: each unit has its own)
+    composite, units    composite answers: the direct answer as individually typed units, in the order
+                        FACT → INFERENCE → RECOMMENDATION → UNKNOWN
     what_changed        claims (FACT) — only for change questions
     why_it_matters      claims (INFERENCE)
     key_points          claims
     recommended_actions claims (RECOMMENDATION) with an optional executable-after-approval `action`
+    unknowns            claims (UNKNOWN): what ROOK cannot establish from available evidence
     sections            grouped detail lists of claims
     sources             every permitted source cited anywhere in the answer
 """
 
 from __future__ import annotations
 
+import logging
 import re
 
 from sqlalchemy import select
@@ -24,13 +29,14 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..ai.providers import LLMError, get_provider
 from ..models import Commitment, Decision, Project, Risk, Signal, User, utcnow
-from ..trust import FACT, INFERENCE, RECOMMENDATION, UNKNOWN, claim, weakest
+from ..trust import FACT, INFERENCE, RECOMMENDATION, UNKNOWN, answer_violations, claim, weakest
 from .briefing import build_brief
 from .meetings import find_meeting, preparation
 from .permissions import visible_signals
 from .text import tokens
 from .views import Viewer, signal_ref
 
+log = logging.getLogger(__name__)
 NO_EVIDENCE = "I couldn't find enough evidence to answer this confidently."
 LEVEL = {"high": 0, "medium": 1, "low": 2}
 
@@ -74,6 +80,11 @@ def _decide_rec(d: dict) -> dict:
                  action={"type": "decide", "decision_id": d["id"]}, basis=f"{d['code']} is waiting for you.")
 
 
+def _who(ref: dict) -> str:
+    """'Channel · Author', without repeating a system author that equals its channel (e.g. Jira · Jira)."""
+    return ref["channel"] if ref["author"] in ("", ref["channel"]) else f"{ref['channel']} · {ref['author']}"
+
+
 def _dedupe(recs: list[dict | None], limit: int = 3) -> list[dict]:
     out, seen = [], set()
     for r in recs:
@@ -90,12 +101,16 @@ def _section(title: str, items: list[dict]) -> dict:
     return {"title": title, "items": items}
 
 
-def _result(intent: str, answer: str, *, claim_type: str, confidence: str, sections=None, key_points=None,
-            recommended_actions=None, what_changed=None, why_it_matters=None, **extra) -> dict:
+def _result(intent: str, answer: str, *, claim_type: str | None, confidence: str | None, sections=None, key_points=None,
+            recommended_actions=None, what_changed=None, why_it_matters=None, unknowns=None, units=None,
+            composite: bool = False, **extra) -> dict:
+    """A single-type answer has one claim_type. A composite answer has claim_type None and is read through
+    `units`, each carrying its own type, evidence and confidence."""
     return {"intent": intent, "answer": answer, "claim_type": claim_type, "confidence": confidence,
+            "composite": composite, "units": units or [],
             "what_changed": what_changed or [], "why_it_matters": why_it_matters or [],
             "key_points": key_points or [], "recommended_actions": recommended_actions or [],
-            "sections": sections or [], **extra}
+            "unknowns": unknowns or [], "sections": sections or [], **extra}
 
 
 # --------------------------------------------------------------------------- graph helpers
@@ -152,38 +167,45 @@ def _changed_and_do(db: Session, user: User, v: Viewer, brief: dict) -> dict:
         return 3 * len(risk_by_signal.get(ch["signal_id"], [])) + len(ch["derived"]) + ch["authority"]
 
     changes = sorted(brief["changes"], key=change_score, reverse=True)[:4]
-    what_changed = [claim(f"{ch['channel']} · {ch['author']}: {ch['summary']}", FACT, confidence="high",
+    what_changed = [claim(f"{_who(ch)}: {ch['summary']}", FACT, confidence="high",
                           evidence=[ch], meta=", ".join(ch["derived"]), basis="Stated in the source.") for ch in changes]
 
     touched = {r["id"]: r for ch in changes for r in risk_by_signal.get(ch["signal_id"], [])}
     affected = sorted(touched.values(), key=lambda r: LEVEL[r["level"]]) or [r for r in risks if r["level"] == "high"]
     decisions = {d["id"]: d for d in (v.decision(x) for x in db.scalars(select(Decision).where(Decision.org_id == user.org_id)).all() if v.visible(x))}
-    why = []
+    why, unknowns = [], []
     for r in affected[:3]:
         threatened = [decisions[i] for i in r["related"].get("decisions", []) if i in decisions]
-        text = r["title"] + (f" — puts {threatened[0]['code']} (“{threatened[0]['statement']}”) at risk" if threatened else "")
+        text = r["title"] + (f" \u2014 this may put {threatened[0]['code']} (\u201c{threatened[0]['statement']}\u201d) at risk" if threatened else "")
         why.append(claim(text, INFERENCE, confidence=r["confidence"], evidence=r["evidence"], detail=r["explanation"],
                          meta=f"{r['level']} risk", basis=r["basis"]))
+        # State the limits of what the evidence shows, rather than letting the inference imply them.
+        for d in threatened[:1]:
+            unknowns.append(claim(f"ROOK cannot determine from available evidence whether {d['code']} "
+                                  f"(\u201c{d['statement']}\u201d) will change.", UNKNOWN,
+                                  basis="No accessible source states a change to this decision."))
+        if r["rule"] == "dependency_delay":
+            unknowns.append(claim("ROOK cannot determine a revised completion date for the delayed dependency.", UNKNOWN,
+                                  basis="No accessible source states a new date."))
+    if what_changed and not why:
+        unknowns.append(claim("ROOK found no evidence that these changes affect your open decisions or commitments.", UNKNOWN))
+    if not what_changed:
+        unknowns.append(claim("ROOK found no material changes in your accessible sources in the last 36 hours.", UNKNOWN))
 
     recs = [_risk_rec(r) for r in affected]
     recs += [_decide_rec(d) for d in brief["decisions_pending"] if d["needs_me"]]
     recs += [_followup_rec(c) for c in brief["waiting_for"] if c["status"] == "overdue"]
     recommended = _dedupe(recs, 3)
+    unknowns = list({u["text"]: u for u in unknowns}.values())
 
-    if what_changed:
-        lead = changes[0]["summary"].rstrip(".")
-        answer = f"Most important change: {lead} ({changes[0]['channel']})."
-    else:
-        answer = "Nothing material changed in the last 36 hours."
-    if why:
-        answer += f" Why it matters: {why[0]['text']}."
-    if recommended:
-        answer += f" Recommended: {recommended[0]['text']}"
-    conf = weakest([c["confidence"] for c in why] or ["medium"])
-    return _result("changed_and_do", answer, claim_type=INFERENCE if why else FACT, confidence=conf,
-                   what_changed=what_changed, why_it_matters=why, recommended_actions=recommended,
+    # Mixed answers are decomposed into individually typed units (C-008, product owner 2026-10-07):
+    # never one weakest-type label for the whole response. The direct answer is the lead unit of each type.
+    units = [g[0] for g in (what_changed, why, recommended, unknowns) if g]
+    return _result("changed_and_do", "Here is what changed, why it may matter, what ROOK recommends, and what it cannot establish.",
+                   claim_type=None, confidence=None, composite=True, units=units,
+                   what_changed=what_changed, why_it_matters=why, recommended_actions=recommended, unknowns=unknowns,
                    sections=[_section("What changed", what_changed), _section("Why it matters", why),
-                             _section("Recommended actions", recommended)])
+                             _section("Recommended actions", recommended), _section("What ROOK cannot establish", unknowns)])
 
 
 # --------------------------------------------------------------------------- intent routing
@@ -197,7 +219,7 @@ def _structured(db: Session, user: User, q: str) -> dict | None:
         return _changed_and_do(db, user, v, brief)
 
     if re.search(r"\b(what changed|since yesterday|what's new|what is new|recent changes)\b", ql):
-        items = [claim(f"{c['channel']} · {c['author']}: {c['summary']}", FACT, confidence="high", evidence=[c],
+        items = [claim(f"{_who(c)}: {c['summary']}", FACT, confidence="high", evidence=[c],
                        meta=", ".join(c["derived"]), basis="Stated in the source.") for c in brief["changes"]]
         return _result("changes", f"{len(items)} meaningful change(s) in the last 36 hours.", claim_type=FACT,
                        confidence="high", key_points=items, what_changed=items, sections=[_section("Changes", items)])
@@ -347,7 +369,7 @@ def _llm_narrative(q: str, context: str, valid_ids: set[int]) -> tuple[str, str]
 
 def _collect_sources(result: dict) -> list[dict]:
     seen, out = set(), []
-    groups = [result["what_changed"], result["why_it_matters"], result["key_points"], result["recommended_actions"]]
+    groups = [result["units"], result["what_changed"], result["why_it_matters"], result["key_points"], result["recommended_actions"]]
     groups += [s["items"] for s in result["sections"]]
     for items in groups:
         for it in items:
@@ -362,7 +384,8 @@ def ask(db: Session, user: User, question: str) -> dict:
     q = question.strip()
     result = _structured(db, user, q)
     engine = "structured"
-    has_content = result and (result.get("key_points") or result.get("what_changed") or any(s["items"] for s in result["sections"]))
+    has_content = result and (result.get("units") or result.get("key_points") or result.get("what_changed")
+                              or any(s["items"] for s in result["sections"]))
     if result is None or (not result.pop("final", False) and not has_content):
         hits = _retrieve(db, user, q)
         if not hits:
@@ -384,6 +407,8 @@ def ask(db: Session, user: User, question: str) -> dict:
         result["claim_type"], result["confidence"] = UNKNOWN, "low"
     result["engine"] = engine
     result["question"] = q
+    if problems := answer_violations(result):  # trust gate: should never fire; tests enforce it
+        log.error("answer failed trust checks", extra={"intent": result["intent"], "problems": len(problems)})
     audit.record(db, org_id=user.org_id, user_id=user.id, actor=f"user:{user.email}", action="ask",
                  intent=q[:300], tool="ask_rook", authorization="user session",
                  result=f"intent={result['intent']} claim={result['claim_type']} sources={len(result['sources'])}")

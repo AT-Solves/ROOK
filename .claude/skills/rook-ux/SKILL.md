@@ -17,9 +17,13 @@ Any frontend work, UI copy, or API shape decision driven by a screen.
   Use progressive disclosure: insight → evidence → context → source → full conversation.
 - **Information hierarchy**: attention, then decisions, risks, commitments, meetings, changes,
   evidence, and raw sources (UX §2).
-- **Navigation (MVP)**: Home, Ask ROOK, Meetings, Decisions, Commitments, Risks, Sources and
-  Settings. Hide Projects, People and Briefings until their P1 features are implemented (UX §3:
-  "hide future modules").
+- **Navigation (MVP)**: Home, Ask ROOK, Meetings, Decisions, Commitments, Risks and Sources
+  (`frontend/src/components/shell.tsx`). Settings is pending C-007. Hide Projects, People and
+  Briefings until their P1 features are implemented (UX §3: "hide future modules").
+- **Implementation**: screens live in `frontend/src/app/(workspace)/`; the only API boundary is
+  `frontend/src/lib/api.ts`. Trust UI is in `components/trust.tsx` (claim badges are always text),
+  `evidence.tsx` (collapsed evidence), `states.tsx` (loading, empty, error, permission-denied), and
+  `followup.tsx` (draft → explicit approval). See ADR-0007.
 - **Home** sections per UX §4 and MVP P0: Needs Attention, Today, Decisions, Commitments,
   Waiting For, At Risk, Recent Changes. The header shows greeting, date and refresh state.
 - **Ask ROOK answers** are structured: direct answer, key points, recommended action, evidence,
@@ -34,7 +38,9 @@ Any frontend work, UI copy, or API shape decision driven by a screen.
 - **Visual**: calm neutral base, strong typography, restrained status colour, dense but
   uncluttered. Desktop first, and responsive for tablet and phone briefing (UX §16, §18).
 - **Epistemic clarity**: visibly distinguish fact, inference, recommendation and unknown.
-  Inferred items read as suggestions that need confirmation.
+  Inferred items read as suggestions that need confirmation. "ROOK must decompose mixed answers into individually typed claims rather than assigning one weakest-confidence label to the entire response." A composite
+  answer is shown as separately labelled units (`components/ask.tsx::DirectUnits`), never with one badge
+  for the whole answer (C-008).
 
 ## Constraints
 - No gamification, celebratory animation, red-alert urgency styling, or chat-only flows (Principle 8).
