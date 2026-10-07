@@ -2,7 +2,7 @@
 
 import pytest
 
-from rook.trust import FACT, INFERENCE, RECOMMENDATION
+from rook.trust import FACT, INFERENCE, RECOMMENDATION, UNKNOWN
 from tests.conftest import connect_m365, entra_sign_in
 
 
@@ -56,13 +56,15 @@ def test_mvp_success_loop(client, m365, tenant):
 
     # 9. "What changed and what should I do?" → one evidence-backed answer
     ans = client.post("/api/ask", json={"question": "What changed and what should I do?"}, headers=h).json()
-    assert ans["intent"] == "changed_and_do"
+    assert ans["intent"] == "changed_and_do" and ans["composite"] and ans["claim_type"] is None
+    assert [u["claim_type"] for u in ans["units"]] == [FACT, INFERENCE, RECOMMENDATION, UNKNOWN]
     assert any("API release" in c["text"] and c["claim_type"] == FACT for c in ans["what_changed"])
     assert ans["why_it_matters"][0]["claim_type"] == INFERENCE and decision["code"] in ans["why_it_matters"][0]["text"]
+    assert ans["unknowns"] and all(not u["evidence"] for u in ans["unknowns"])
     rec = ans["recommended_actions"][0]
     assert rec["claim_type"] == RECOMMENDATION
     assert rec["action"] == {"type": "draft_followup", "commitment_id": perf["id"], "risk_id": risk["id"]}
-    assert ans["sources"] and ans["confidence"] in {"high", "medium", "low"}
+    assert ans["sources"] and all(u["confidence"] in {"high", "medium", "low"} for u in ans["units"])
 
     # 10. Follow-up draft on request, with supporting context
     draft = client.post(f"/api/commitments/{perf['id']}/followup", json={"risk_id": risk["id"]}, headers=h).json()

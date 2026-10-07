@@ -46,15 +46,20 @@ test("executive workflow: attention → meeting → evidence → ask → recomme
   await page.getByLabel("Ask ROOK a question").fill("What changed and what should I do?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   const answer = page.getByRole("article");
-  await expect(answer.getByRole("heading", { name: "What changed" })).toBeVisible();
-  await expect(answer.getByRole("heading", { name: "Why it matters" })).toBeVisible();
-  await expect(answer.getByText(/confidence/).first()).toBeVisible();
+  // C-008: one typed unit per kind of claim, in order; no single label for the whole answer
+  const units = answer.locator("[data-unit-type]");
+  await expect(units).toHaveCount(4);
+  expect(await units.evaluateAll((els) => els.map((e) => e.getAttribute("data-unit-type")))).toEqual(["FACT", "INFERENCE", "RECOMMENDATION", "UNKNOWN"]);
+  await expect(units.nth(0).getByText(/Source · \d+ source/)).toBeVisible();
+  await expect(units.nth(1)).toContainText("D-1001");
+  await expect(units.nth(1).getByText(/confidence/)).toBeVisible();
+  await expect(units.nth(3)).toContainText("ROOK cannot determine");
   await expect(answer.getByText(/Sources · \d+/)).toBeVisible();
 
   // 9. What action ROOK recommends → draft → explicit approval
-  const rec = answer.getByRole("region", { name: "Recommended action" });
+  const rec = units.nth(2);
   await expect(rec).toContainText("Ask Marcus for a recovery plan");
-  await rec.getByRole("button", { name: "Draft follow-up" }).first().click();
+  await rec.getByRole("button", { name: "Draft follow-up" }).click();
   const draft = page.getByRole("region", { name: "Follow up with Marcus Chen" });
   await expect(draft).toContainText("Nothing is sent until you approve");
   await expect(draft.getByLabel("Message")).toHaveValue(/recovery plan/);

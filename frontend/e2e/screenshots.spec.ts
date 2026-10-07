@@ -20,10 +20,10 @@ test("capture P0 screens", async ({ page }) => {
   await page.goto("/ask");
   await page.getByRole("button", { name: "What changed and what should I do?" }).click();
   const answer = page.getByRole("article");
-  await expect(answer.getByRole("heading", { name: "Why it matters" })).toBeVisible();
-  await answer.getByText(/Evidence · \d+ sources/).first().click();
+  await expect(answer.locator('[data-unit-type="UNKNOWN"]')).toBeVisible();
+  await answer.locator('[data-unit-type="INFERENCE"]').getByText(/Source · \d+ sources/).click();
   await page.screenshot({ path: `${OUT}/03-ask-what-changed.png`, fullPage: true });
-  await answer.getByRole("button", { name: "Draft follow-up" }).first().click();
+  await answer.locator('[data-unit-type="RECOMMENDATION"]').getByRole("button", { name: "Draft follow-up" }).click();
   await expect(page.getByText("Nothing is sent until you approve")).toBeVisible();
   await page.getByRole("region", { name: /Follow up with/ }).screenshot({ path: `${OUT}/04-followup-draft-approval.png` });
 

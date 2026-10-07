@@ -178,8 +178,13 @@ export interface AskAnswer {
   intent: string;
   engine: string;
   answer: string;
-  claim_type: ClaimType;
-  confidence: Confidence;
+  /** Single-type answers only. Null for a composite answer: mixed claims are never collapsed into one label (C-008). */
+  claim_type: ClaimType | null;
+  confidence: Confidence | null;
+  /** Composite answers: the direct answer as individually typed units, FACT → INFERENCE → RECOMMENDATION → UNKNOWN. */
+  composite: boolean;
+  units: Claim[];
+  unknowns: Claim[];
   what_changed: Claim[];
   why_it_matters: Claim[];
   key_points: Claim[];

@@ -37,6 +37,9 @@ Changes under `backend/rook/ai/` or the agent-like services: `services/briefing.
 - **Tool safety**: every action has actor, intent, tool, input, authorisation and result in the
   audit log. No hidden autonomous actions. External execution goes through `actions.approve`
   and the org policy.
+- **Composite answers**: "ROOK must decompose mixed answers into individually typed claims rather than assigning one weakest-confidence label to the entire response." Answers that combine
+  changes, impact and advice return typed `units` (FACT → INFERENCE → RECOMMENDATION → UNKNOWN) and state
+  explicitly what ROOK cannot determine (C-008, `services/ask.py::_changed_and_do`).
 - **Risk explanations**: every risk states what, why, source, when and suggested next step
   (UX §9, README §43). There are no opaque scores.
 - **Tone**: copy follows the ROOK personality (calm, precise, no manufactured urgency).

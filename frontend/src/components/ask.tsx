@@ -3,9 +3,9 @@
 import { useId, useState } from "react";
 
 import { ApiError, api } from "@/lib/api";
-import type { AskAnswer, Claim } from "@/lib/types";
+import type { AskAnswer, Claim, ClaimType } from "@/lib/types";
 
-import { RecommendationClaim } from "./actions";
+import { ActionControl, RecommendationClaim } from "./actions";
 import { EvidenceList, SourceLine } from "./evidence";
 import { ClaimBadge, ConfidenceLabel } from "./trust";
 import { primaryButtonClass } from "./ui";
@@ -94,6 +94,22 @@ export function AskForm({ onAnswer, compact = false }: { onAnswer: (a: AskAnswer
   );
 }
 
+function RecommendationList({ claims, id }: { claims: Claim[]; id: string }) {
+  if (!claims.length) return null;
+  return (
+    <section aria-labelledby={id} className="mt-4">
+      <h3 id={id} className="text-xs font-semibold uppercase tracking-wide text-muted">
+        Recommended action
+      </h3>
+      <ul className="mt-2 space-y-2">
+        {claims.map((r, i) => (
+          <RecommendationClaim key={i} claim={r} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ClaimList({ title, claims, id }: { title: string; claims: Claim[]; id: string }) {
   if (!claims.length) return null;
   return (
@@ -124,6 +140,42 @@ function ClaimList({ title, claims, id }: { title: string; claims: Claim[]; id: 
   );
 }
 
+const UNIT_HEADING: Record<ClaimType, string> = {
+  FACT: "What changed",
+  INFERENCE: "Why it may matter",
+  RECOMMENDATION: "What ROOK recommends",
+  UNKNOWN: "What ROOK cannot establish",
+};
+
+/** Composite direct answer (C-008): one typed unit per kind of claim — never one label for the whole answer. */
+function DirectUnits({ units, id }: { units: Claim[]; id: string }) {
+  return (
+    <ol aria-labelledby={id} className="mt-3 space-y-3">
+      {units.map((u, i) => (
+        <li key={i} className="rounded-md border border-line p-3" data-unit-type={u.claim_type}>
+          <div className="flex flex-wrap items-center gap-2">
+            <ClaimBadge type={u.claim_type} />
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">{UNIT_HEADING[u.claim_type]}</span>
+            {u.claim_type !== "UNKNOWN" ? <ConfidenceLabel value={u.confidence} /> : null}
+          </div>
+          <p className="mt-1 text-[15px] leading-relaxed text-ink">{u.text}</p>
+          {u.basis ? <p className="mt-0.5 text-xs text-muted">{u.basis}</p> : null}
+          {u.evidence.length ? (
+            <div className="mt-1">
+              <EvidenceList evidence={u.evidence} label={u.claim_type === "RECOMMENDATION" ? "Based on" : "Source"} />
+            </div>
+          ) : null}
+          {u.action ? (
+            <div className="mt-2">
+              <ActionControl action={u.action} />
+            </div>
+          ) : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /** Structured answer (UX §5): direct answer → key points → recommended action → evidence → sources. */
 export function AnswerView({ a }: { a: AskAnswer }) {
   const base = useId();
@@ -133,30 +185,39 @@ export function AnswerView({ a }: { a: AskAnswer }) {
       <p id={`${base}-q`} className="text-xs font-medium uppercase tracking-wide text-muted">
         {a.question}
       </p>
-      <div className="mt-2 flex items-start gap-2">
-        <ClaimBadge type={a.claim_type} className="mt-0.5" />
-        <p className="text-[15px] leading-relaxed text-ink">{a.answer}</p>
-      </div>
-      <p className="mt-1 pl-1">
-        <ConfidenceLabel value={a.confidence} />
-      </p>
+      {a.composite ? (
+        <>
+          <p className="mt-2 text-sm text-muted">{a.answer}</p>
+          <DirectUnits units={a.units} id={`${base}-q`} />
+          <details className="mt-4">
+            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted">
+              All details · {a.what_changed.length + a.why_it_matters.length + a.recommended_actions.length + a.unknowns.length} statements
+            </summary>
+            <ClaimList title="What changed" claims={a.what_changed} id={`${base}-wc`} />
+            <ClaimList title="Why it matters" claims={a.why_it_matters} id={`${base}-why`} />
+            <RecommendationList claims={a.recommended_actions} id={`${base}-allrec`} />
+            <ClaimList title="What ROOK cannot establish" claims={a.unknowns} id={`${base}-unk`} />
+          </details>
+        </>
+      ) : (
+        <>
+          <div className="mt-2 flex items-start gap-2">
+            {a.claim_type ? <ClaimBadge type={a.claim_type} className="mt-0.5" /> : null}
+            <p className="text-[15px] leading-relaxed text-ink">{a.answer}</p>
+          </div>
+          {a.confidence ? (
+            <p className="mt-1 pl-1">
+              <ConfidenceLabel value={a.confidence} />
+            </p>
+          ) : null}
+        </>
+      )}
 
-      <ClaimList title="What changed" claims={a.what_changed} id={`${base}-wc`} />
-      <ClaimList title="Why it matters" claims={a.why_it_matters} id={`${base}-why`} />
+      {!a.composite ? <ClaimList title="What changed" claims={a.what_changed} id={`${base}-wc`} /> : null}
+      {!a.composite ? <ClaimList title="Why it matters" claims={a.why_it_matters} id={`${base}-why`} /> : null}
       <ClaimList title="Key points" claims={keyPoints.slice(0, 8)} id={`${base}-kp`} />
 
-      {a.recommended_actions.length ? (
-        <section aria-labelledby={`${base}-rec`} className="mt-4">
-          <h3 id={`${base}-rec`} className="text-xs font-semibold uppercase tracking-wide text-muted">
-            Recommended action
-          </h3>
-          <ul className="mt-2 space-y-2">
-            {a.recommended_actions.map((r, i) => (
-              <RecommendationClaim key={i} claim={r} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      {!a.composite ? <RecommendationList claims={a.recommended_actions} id={`${base}-rec`} /> : null}
 
       {a.sources.length ? (
         <details className="mt-4">

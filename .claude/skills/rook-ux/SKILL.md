@@ -38,7 +38,9 @@ Any frontend work, UI copy, or API shape decision driven by a screen.
 - **Visual**: calm neutral base, strong typography, restrained status colour, dense but
   uncluttered. Desktop first, and responsive for tablet and phone briefing (UX §16, §18).
 - **Epistemic clarity**: visibly distinguish fact, inference, recommendation and unknown.
-  Inferred items read as suggestions that need confirmation.
+  Inferred items read as suggestions that need confirmation. "ROOK must decompose mixed answers into individually typed claims rather than assigning one weakest-confidence label to the entire response." A composite
+  answer is shown as separately labelled units (`components/ask.tsx::DirectUnits`), never with one badge
+  for the whole answer (C-008).
 
 ## Constraints
 - No gamification, celebratory animation, red-alert urgency styling, or chat-only flows (Principle 8).
