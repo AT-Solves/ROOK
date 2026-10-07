@@ -12,6 +12,8 @@ Precedence: 04 Principles > 00 Vision > 01 PRD > 02 MVP Scope > 03 UX/UI Spec > 
 | C-003 | resolved by precedence | Navigation: Projects / People / Briefings in MVP |
 | C-004 | **resolved** (product owner, 2026-10-07) | Keep Ollama adapter as experimental/unsupported (P2) |
 | C-005 | resolved — ADR-0006 | Retrieval: README hybrid/semantic vs keyword-first MVP |
+| C-007 | **open** — needs product owner | Settings screen (audit log, AI action policy) is not in the M3 screen list |
+| C-008 | **open** — needs product owner (confirm) | One claim-type label on a composite direct answer |
 
 ---
 
@@ -40,6 +42,20 @@ Precedence: 04 Principles > 00 Vision > 01 PRD > 02 MVP Scope > 03 UX/UI Spec > 
 ### C-005 — Retrieval strategy for MVP
 - **Artifacts:** README §29 (hybrid: semantic + keyword + metadata + graph) · 01_PRD (silent) · 04_PRINCIPLES 12.
 - **Not a product conflict**, but an architecture decision: the MVP uses structured registers + keyword + authority/recency + graph hop; pgvector semantic retrieval is added when the eval set shows a recall gap. Captured as ADR-0006.
+
+### C-007 — Settings screen in the MVP navigation
+- **Artifacts:** 03_UX_UI_SPEC §3 lists *Settings*; 02_MVP_SCOPE P0 *Audit* ("track important user and system actions"); PRD user story "As an administrator, I want audit logs…"; the M3 request lists the P0 screens without Settings; `rook-ux` named Settings as part of the MVP nav.
+- **Conflict:** The audit log and the AI action policy exist in the API (`GET /api/audit`, `GET/PUT /api/admin/policy`) but have no screen. Following the M3 screen list, Settings is **not** shown in the navigation, so administrators can only reach audit records through the API.
+- **Options:** (a) add a minimal Settings screen in M3 (read-only audit log plus action-policy view with `auto` disabled for external communication); (b) defer it to the next milestone and keep audit API-only for now.
+- **Recommendation:** (a) as a small follow-up. The data and endpoints already exist, and it makes FR-13 visible to administrators.
+- **Resolution:** _pending_
+
+### C-008 — Claim type of a composite direct answer
+- **Artifacts:** 01_PRD §7 (distinguish fact / inference / recommendation / unknown); 04_PRINCIPLES 9; UX §5 (direct answer first).
+- **Observation:** For "What changed and what should I do?", the one-sentence direct answer combines a fact (what changed), an inference (why it matters) and a recommendation. The UI labels the whole sentence with the **weakest** applicable type (INFERENCE), so it is never shown as a fact. Each part is then broken out below with its own label and evidence.
+- **Options:** (a) keep the weakest-type label on the summary sentence (current); (b) drop the summary sentence and show only the labelled parts; (c) render the summary as three labelled clauses.
+- **Recommendation:** (a). It is conservative and readable, and nothing is overstated.
+- **Resolution:** _pending confirmation_
 
 ### C-006 — Environment variable names for Microsoft credentials
 - **Artifacts:** product-owner decision 2026-10-07 names `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`; the prototype used a `ROOK_` prefix.

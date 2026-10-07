@@ -230,6 +230,55 @@ def commitments(scope: str = "all", user: User = Depends(current_user), db: Sess
     return rows
 
 
+def _visible_or_404(db: Session, user: User, model, id_: int):
+    row = _owned(db, model, id_, user)
+    if not Viewer(db, user).visible(row):
+        raise HTTPException(404, "Not found")  # don't reveal that a restricted item exists
+    return row
+
+
+def _open_risks(db: Session, user: User, v: Viewer) -> list[dict]:
+    return [v.risk(r) for r in db.scalars(select(Risk).where(Risk.org_id == user.org_id, Risk.status != "resolved")).all()
+            if v.visible(r)]
+
+
+@router.get("/decisions/{did}")
+def decision_detail(did: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Decision detail (UX §7): the decision plus related actions and the risks that reference it."""
+    d = _visible_or_404(db, user, Decision, did)
+    v = Viewer(db, user)
+    risks = [r for r in _open_risks(db, user, v) if d.id in r["related"].get("decisions", [])]
+    return v.decision(d) | {"related_risks": risks}
+
+
+@router.get("/commitments/{cid}")
+def commitment_detail(cid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Commitment detail (UX §8): the commitment, related risks, and this user's follow-up drafts for it."""
+    c = _visible_or_404(db, user, Commitment, cid)
+    v = Viewer(db, user)
+    risks = [r for r in _open_risks(db, user, v) if c.id in r["related"].get("commitments", [])]
+    drafts = db.scalars(select(ActionProposal).where(
+        ActionProposal.org_id == user.org_id, ActionProposal.user_id == user.id,
+        ActionProposal.related_type == "commitment", ActionProposal.related_id == c.id)
+        .order_by(ActionProposal.created_at.desc())).all()
+    return v.commitment(c, utcnow().date()) | {"related_risks": risks, "followups": [_proposal(p) for p in drafts]}
+
+
+@router.get("/risks/{rid}")
+def risk_detail(rid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Risk detail (UX §9): why it was detected, evidence, related commitments/decisions, suggested next step."""
+    r = _owned(db, Risk, rid, user)
+    v = Viewer(db, user)
+    if not v.visible(r):
+        raise HTTPException(404, "Not found")
+    rel = r.related or {}
+    commitments = [v.commitment(c, utcnow().date()) for c in db.scalars(select(Commitment).where(
+        Commitment.org_id == user.org_id, Commitment.id.in_(rel.get("commitments", []) or [-1]))).all() if v.visible(c)]
+    decisions = [v.decision(d) for d in db.scalars(select(Decision).where(
+        Decision.org_id == user.org_id, Decision.id.in_(rel.get("decisions", []) or [-1]))).all() if v.visible(d)]
+    return v.risk(r) | {"related_commitments": commitments, "related_decisions": decisions}
+
+
 class AcceptIn(BaseModel):
     owner_name: str | None = None
 

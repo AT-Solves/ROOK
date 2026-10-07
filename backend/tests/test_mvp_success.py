@@ -60,7 +60,8 @@ def test_mvp_success_loop(client, m365, tenant):
     assert any("API release" in c["text"] and c["claim_type"] == FACT for c in ans["what_changed"])
     assert ans["why_it_matters"][0]["claim_type"] == INFERENCE and decision["code"] in ans["why_it_matters"][0]["text"]
     rec = ans["recommended_actions"][0]
-    assert rec["claim_type"] == RECOMMENDATION and rec["action"] == {"type": "draft_followup", "commitment_id": perf["id"]}
+    assert rec["claim_type"] == RECOMMENDATION
+    assert rec["action"] == {"type": "draft_followup", "commitment_id": perf["id"], "risk_id": risk["id"]}
     assert ans["sources"] and ans["confidence"] in {"high", "medium", "low"}
 
     # 10. Follow-up draft on request, with supporting context

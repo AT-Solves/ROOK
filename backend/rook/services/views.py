@@ -133,11 +133,19 @@ class Viewer:
             "detected_at": iso(r.detected_at),
             "claim_type": INFERENCE if evidence else UNKNOWN,  # risks are always ROOK's derivation
             "basis": f"Detected by rule '{r.rule}' from {len(evidence)} source(s).",
-            "recommended_action": {"text": r.recommendation, "claim_type": RECOMMENDATION, "action": r.action or {}}
+            "recommended_action": {"text": r.recommendation, "claim_type": RECOMMENDATION, "action": self._risk_action(r)}
             if r.recommendation else None,
             "related": r.related or {},
             "evidence": evidence,
         }
+
+    @staticmethod
+    def _risk_action(r: Risk) -> dict:
+        """A follow-up drafted from a risk carries the risk, so the draft can include its context."""
+        action = dict(r.action or {})
+        if action.get("type") == "draft_followup":
+            action["risk_id"] = r.id
+        return action
 
     def meeting(self, m: Meeting) -> dict:
         return {

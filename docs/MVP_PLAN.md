@@ -30,7 +30,7 @@ Communication → Context → Decision → Commitment → Follow-up → Risk →
 10. The user requests a follow-up draft, and ROOK generates it.
 11. The user explicitly approves before any external communication is sent.
 
-Automated as `backend/tests/test_mvp_success.py` (steps 3–11 on the demo tenant, plus steps 1–2 against a mocked Microsoft Graph). The UI walk-through is part of M3.
+Automated as `backend/tests/test_mvp_success.py` (steps 1–11 through a mocked Microsoft 365 tenant) and in the UI as `frontend/e2e/workflow.spec.ts` (steps 3–11 on the demo tenant through the real API).
 
 ## Milestones
 | # | Milestone | Lead skills | Status |
@@ -39,7 +39,7 @@ Automated as `backend/tests/test_mvp_success.py` (steps 3–11 on the demo tenan
 | M2 | **Trust layer** (claim types, provenance, recommended actions, combined answer) | ai-eval, agents, retrieval, context-graph | ✅ done (this iteration) |
 | M4 | **Microsoft 365 connector + Entra ID sign-in** | connectors, security, data | ✅ code done with mocked Graph tests; ⏳ needs the owner's app registration for a live run |
 | M1 | Lightweight foundation: Postgres, compose, CI, timestamps in UTC with user time zone | devops (light), data, quality | ✅ done (Alembic deferred to the first shared environment, see R23) |
-| M3 | Web UI P0 screens | ux, api | ⏳ next |
+| M3 | **Web UI P0 screens** (Home, Ask ROOK, Meetings, Meeting detail, Decisions, Commitments, Risks, Sources/Evidence) | ux, api, security, ai-eval, quality | ✅ done (C-007, C-008 open) |
 | M5 | LLM mode with eval parity | agents, ai-eval, observability (light) | later in MVP |
 | M6 | MVP demo on staging + pilot | quality, devops | later in MVP |
 
@@ -68,7 +68,7 @@ Status legend: ✅ implemented and tested · ⚠ partial · ⏳ planned · 🔑 
 | R18 | Follow-up: recommend, draft with context, explicit approval, no autonomous send (FR-12, C-001) | `services/actions.py`, policy endpoints | `test_api.py::test_followup_*`, `test_policy_*`, `test_mvp_success.py` | Draft includes evidence; `auto` rejected for send kinds; only the requester can approve a send; nothing is sent without approval; Graph send off by default | R15, R01 | ✅ |
 | R19 | Audit of important user, system, connector and external actions (FR-13) | `audit.py`, `AuditLog` | `test_api.py`, `test_identity.py` | Sign-in, connect, sync, extraction, risk, draft, approve, reject, block and send are each recorded with actor, intent, tool, input, authorisation, result | — | ✅ |
 | R20 | Multi-tenant isolation (NFR) | `org_id` on all rows, `_owned` | `tests/test_tenancy.py` | Cross-org IDs → 404; brief and Ask never include other-org data | — | ✅ |
-| R21 | Web UI P0 screens, empty/loading/error states, WCAG 2.2 AA (UX spec) | `frontend/` | Playwright | Per `rook-ux` | R08–R18 | ⏳ M3 |
+| R21 | Web UI P0 screens, empty/loading/error/permission-denied states, WCAG 2.2 AA (UX spec) | `frontend/src/app/(workspace)/*`, API boundary `frontend/src/lib/api.ts`, detail endpoints `GET /api/{decisions,commitments,risks}/{id}` | `frontend/src/__tests__/*` (Vitest), `frontend/e2e/{workflow,states,a11y}.spec.ts` (Playwright + axe), `backend/tests/test_api.py::test_detail_*` | Executive workflow 1–9 passes end to end against the real API; every insight shows its claim type and evidence; no serious/critical axe violations on any P0 screen; keyboard-only navigation; MVP nav only | R08–R18 | ✅ (Settings: C-007) |
 | R22 | Model-provider abstraction with deterministic fallback (NFR) | `ai/providers.py` | `test_extraction.py` | Rules mode works with no key; LLM output must quote the source or is dropped | — | ✅ |
 | R23 | Lightweight DevOps: compose (Postgres + API), CI, no secrets in repo | `docker-compose.yml`, `backend/Dockerfile`, `.github/workflows/ci.yml` | CI | One-command local run; CI runs tests on SQLite and Postgres | — | ✅ (Alembic ⏳ before the first shared environment) |
 | R24 | Lightweight observability: structured logs without content, health | `rook/logging.py`, `/api/health` | `test_api.py` | JSON logs with org and request IDs; no message bodies in logs | — | ✅ |

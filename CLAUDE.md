@@ -15,3 +15,12 @@ ROOK_TEST_DATABASE_URL=postgresql+psycopg://... .venv/bin/python -m pytest -q   
 .venv/bin/uvicorn rook.main:app --reload    # demo tenant when ROOK_DEV_LOGIN=true; log in as yamini@acme.example
 ```
 Or `docker compose up --build` from the repo root (Postgres + API).
+
+## Frontend (`frontend/`, ADR-0007)
+Next.js 16 has breaking changes: read `frontend/AGENTS.md` and `frontend/node_modules/next/dist/docs/` before using framework APIs.
+```
+cd frontend && npm ci
+npm run lint && npm run typecheck && npm test        # ESLint, tsc, Vitest
+npm run build && PW_CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome npm run test:e2e   # Playwright + axe (starts API + web)
+CAPTURE_SCREENSHOTS=1 npx playwright test e2e/screenshots.spec.ts    # refresh docs/screenshots
+```

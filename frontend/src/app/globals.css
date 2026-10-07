@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* ROOK design tokens: calm neutral base, restrained status colour (UX §16). All text pairs meet WCAG AA. */
+:root {
+  --bg: #f6f6f3;
+  --surface: #ffffff;
+  --ink: #1b1f24;
+  --muted: #555c64;
+  --line: #e2e2dc;
+  --accent: #1f4e79;
+  --focus: #1a5fd0;
+  --fact-bg: #edf0f3;   --fact-ink: #2b3743;
+  --inf-bg: #fbf2e3;    --inf-ink: #6f4304;
+  --rec-bg: #e8f0fa;    --rec-ink: #1b4a87;
+  --unk-bg: #f1f1f1;    --unk-ink: #4d4d4d;
+  --high-bg: #f9ecea;   --high-ink: #8a2018;
+  --med-bg: #fbf2e3;    --med-ink: #6f4304;
+  --low-bg: #edf0f3;    --low-ink: #2b3743;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121417;
+    --surface: #1a1d21;
+    --ink: #e7e9ec;
+    --muted: #a6adb5;
+    --line: #2c3036;
+    --accent: #8db8e8;
+    --focus: #7fb0ff;
+    --fact-bg: #262c33;   --fact-ink: #d5dde6;
+    --inf-bg: #33281a;    --inf-ink: #f0c98a;
+    --rec-bg: #1d2a3b;    --rec-ink: #a9c9f2;
+    --unk-bg: #2a2a2a;    --unk-ink: #c9c9c9;
+    --high-bg: #3a1f1d;   --high-ink: #f2b3ab;
+    --med-bg: #33281a;    --med-ink: #f0c98a;
+    --low-bg: #262c33;    --low-ink: #d5dde6;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

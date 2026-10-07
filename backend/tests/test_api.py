@@ -114,3 +114,33 @@ def test_request_logs_exclude_query_strings_and_content(client, caplog):
 
 def test_health(client):
     assert client.get("/api/health").json() == {"ok": True, "llm": "rules"}
+
+
+def test_detail_endpoints(client):
+    h = login(client)
+    d = next(d for d in client.get("/api/decisions", headers=h).json() if d["code"] == "D-1001")
+    dd = client.get(f"/api/decisions/{d['id']}", headers=h).json()
+    assert dd["statement"] == d["statement"] and any(r["rule"] == "dependency_delay" for r in dd["related_risks"])
+    perf = next(c for c in client.get("/api/commitments", headers=h).json() if "performance testing" in c["description"])
+    cd = client.get(f"/api/commitments/{perf['id']}", headers=h).json()
+    assert cd["related_risks"] and cd["followups"] == []
+    client.post(f"/api/commitments/{perf['id']}/followup", json={}, headers=h)
+    assert len(client.get(f"/api/commitments/{perf['id']}", headers=h).json()["followups"]) == 1
+    risk = next(r for r in client.get("/api/risks", headers=h).json() if r["rule"] == "dependency_delay")
+    rd = client.get(f"/api/risks/{risk['id']}", headers=h).json()
+    assert rd["related_commitments"][0]["id"] == perf["id"] and rd["related_decisions"][0]["code"] == "D-1001"
+    assert client.get("/api/risks/999999", headers=h).status_code == 404
+    assert client.get(f"/api/decisions/{d['id']}").status_code == 401
+
+
+def test_detail_hides_restricted_items_from_non_participants(client):
+    """A transcript of Yamini's 1:1 with the CFO is restricted to its attendees; Marcus must get 404, not 403."""
+    yamini, marcus = login(client), login(client, "marcus@acme.example")
+    m = next(m for m in client.get("/api/meetings", headers=yamini).json() if m["title"].startswith("1:1 with David"))
+    r = client.post(f"/api/meetings/{m['id']}/transcript", headers=yamini,
+                    json={"text": "David Kim: We decided to freeze hiring in Q4.\nDavid Kim: I'll send the revised budget by tomorrow."}).json()
+    did, cid = r["decisions"][0]["id"], r["commitments"][0]["id"]
+    assert client.get(f"/api/decisions/{did}", headers=yamini).status_code == 200
+    assert client.get(f"/api/decisions/{did}", headers=marcus).status_code == 404
+    assert client.get(f"/api/commitments/{cid}", headers=marcus).status_code == 404
+    assert client.get(f"/api/meetings/{m['id']}/prep", headers=marcus).status_code == 404
