@@ -12,7 +12,8 @@
 cd backend && python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/ruff check rook tests && .venv/bin/python -m pytest -q          # SQLite, rules mode
 ROOK_TEST_DATABASE_URL=postgresql+psycopg://... .venv/bin/python -m pytest -q   # same suite on Postgres
-.venv/bin/uvicorn rook.main:app --reload    # demo tenant when ROOK_DEV_LOGIN=true; log in as yamini@acme.example
+ROOK_DEMO_TIMEZONE=Asia/Kolkata .venv/bin/uvicorn rook.main:app --reload    # demo tenant when ROOK_DEV_LOGIN=true; log in as yamini@acme.example
+# (demo meetings are planned in ROOK_DEMO_TIMEZONE working hours; delete rook.db to re-plan)
 ```
 Or `docker compose up --build` from the repo root (Postgres + API).
 

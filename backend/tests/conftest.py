@@ -9,8 +9,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from rook.bootstrap import ensure_demo_tenant
+from rook.connectors.demo_data import demo_morning_timezone
 from rook.db import get_db, init_db
 from rook.main import create_app
+from rook.models import utcnow
 
 
 @pytest.fixture()
@@ -27,7 +29,8 @@ def session_factory():
     init_db(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     with factory() as db:
-        ensure_demo_tenant(db)
+        # A zone where it is mid-morning right now: a realistic working day whenever the suite runs.
+        ensure_demo_tenant(db, timezone=demo_morning_timezone(utcnow()))
     return factory
 
 

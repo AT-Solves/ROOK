@@ -70,7 +70,8 @@ def build_brief(db: Session, user: User, now: datetime | None = None) -> dict:
     proposed = [c for c in commitments if c.status == "proposed"]
     open_c = [c for c in commitments if c.status == "open"]
 
-    meetings_today = [m for m in visible_meetings(db, user) if day_start <= m.starts_at < max(now + timedelta(hours=12), day_end)]
+    # "Today" is the user's local calendar day — not a rolling window into tomorrow.
+    meetings_today = [m for m in visible_meetings(db, user) if day_start <= m.starts_at < day_end]
     today_items = []
     for m in meetings_today:
         reasons = prep_reasons(db, v, m)

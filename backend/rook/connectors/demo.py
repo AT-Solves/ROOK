@@ -17,7 +17,8 @@ class DemoConnector(BaseConnector):
     can_send = True
 
     def sync(self, since: datetime | None) -> SyncBatch:
-        return demo_data.build(utcnow())
+        # Meeting times are planned in the demo user's configured time zone (set at bootstrap).
+        return demo_data.build(utcnow(), self.config.get("timezone", "UTC"))
 
     def send(self, message: OutboundMessage) -> str:
         # Nothing leaves the system: the demo "outbox" is the audit log.

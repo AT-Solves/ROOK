@@ -8,7 +8,8 @@ and an unowned customer escalation.
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .base import DirectoryPerson, DirectoryProject, NormalizedMeeting, NormalizedSignal, SyncBatch
 
@@ -24,21 +25,63 @@ def _fmt(d: datetime) -> str:
     return f"{d:%B} {d.day}"
 
 
-def build(now: datetime) -> SyncBatch:
-    today = datetime.combine(now.date(), time())
+# Demo meetings happen in normal working hours in the demo user's own time zone.
+WORKDAY_START = time(9, 0)
+WORKDAY_END = time(18, 0)
+
+
+def demo_morning_timezone(now_utc: datetime, local_hour: int = 9) -> str:
+    """Test helper: a fixed-offset zone in which it is currently about `local_hour` o'clock.
+
+    Lets tests and E2E runs see a realistic working day regardless of when CI runs.
+    Etc/GMT signs are inverted: Etc/GMT-5 is UTC+5.
+    """
+    offset = ((local_hour - now_utc.hour + 12) % 24) - 12  # -12..11
+    return "Etc/GMT" if offset == 0 else (f"Etc/GMT-{offset}" if offset > 0 else f"Etc/GMT+{-offset}")
+
+
+def build(now: datetime, tz: str = "UTC") -> SyncBatch:
+    """`now` is naive UTC; times are planned in local time in `tz` and returned as naive UTC."""
+    try:
+        zone = ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError):
+        zone = ZoneInfo("UTC")
+    local_now = now.replace(tzinfo=UTC).astimezone(zone)
+    local_today = local_now.date()
+    today = datetime.combine(local_today, time())  # calendar arithmetic for dates quoted in the text
+
+    def at(day: date, hour: int, minute: int = 0) -> datetime:
+        local = datetime.combine(day, time(hour, minute), tzinfo=zone)
+        return local.astimezone(UTC).replace(tzinfo=None)
 
     def ago(days: int, hour: int = 9, minute: int = 0) -> datetime:
-        return today - timedelta(days=days) + timedelta(hours=hour, minutes=minute)
+        return at(local_today - timedelta(days=days), hour, minute)
 
     def ahead(days: int, hour: int = 9, minute: int = 0) -> datetime:
-        return today + timedelta(days=days) + timedelta(hours=hour, minutes=minute)
+        return at(local_today + timedelta(days=days), hour, minute)
 
-    # Today's agenda is anchored to the next full hour so the demo always has meetings ahead.
-    next_hour = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    def next_slot(earliest_local: datetime, length_min: int, fallback: tuple[int, int, int]) -> tuple[datetime, datetime]:
+        """First half-hour slot at or after `earliest_local` that fits in today's working hours;
+        otherwise the fallback (days ahead, hour, minute) — never a meeting in the middle of the night."""
+        start = earliest_local.replace(second=0, microsecond=0)
+        if start.minute not in (0, 30):
+            start = start.replace(minute=30) if start.minute < 30 else start.replace(minute=0) + timedelta(hours=1)
+        start = max(start, datetime.combine(local_today, WORKDAY_START, tzinfo=zone))
+        end = start + timedelta(minutes=length_min)
+        if start.date() == local_today and end <= datetime.combine(local_today, WORKDAY_END, tzinfo=zone):
+            utc = start.astimezone(UTC).replace(tzinfo=None)
+            return utc, utc + timedelta(minutes=length_min)
+        d, h, m = fallback
+        begin = ahead(d, h, m)
+        return begin, begin + timedelta(minutes=length_min)
 
-    def slot(hours: float, length_min: int = 60) -> tuple[datetime, datetime]:
-        start = next_hour + timedelta(hours=hours)
-        return start, start + timedelta(minutes=length_min)
+    # Today's agenda: a morning stand-up, then the key meetings at sensible local times still ahead of
+    # the user when possible. Meetings that no longer fit before end of day move to the next morning.
+    review = next_slot(local_now + timedelta(minutes=30), 60, (1, 9, 30))
+    review_local = review[0].replace(tzinfo=UTC).astimezone(zone)
+    steering = next_slot(review_local + timedelta(hours=3), 60, (1, 13, 0))
+    steering_local = steering[0].replace(tzinfo=UTC).astimezone(zone)
+    cfo = next_slot(steering_local + timedelta(hours=2), 30, (1, 15, 30))
 
     launch_date = today + timedelta(days=11)
     perf_due = today + timedelta(days=1)
@@ -96,17 +139,17 @@ def build(now: datetime) -> SyncBatch:
             "Weekly product leadership: Phoenix launch readiness and pricing.",
         ),
         # today and upcoming
-        NormalizedMeeting("mtg-staff", "Executive staff stand-up", *slot(-2, 30), leadership, LEADER_EMAIL,
+        NormalizedMeeting("mtg-staff", "Executive staff stand-up", ahead(0, 8, 30), ahead(0, 9, 0), leadership, LEADER_EMAIL,
                           "Weekly staff alignment."),
         NormalizedMeeting(
-            "mtg-review", "Phoenix Product Review", *slot(0), [LEADER_EMAIL, _e("priya"), _e("marcus"), _e("tom")],
+            "mtg-review", "Phoenix Product Review", *review, [LEADER_EMAIL, _e("priya"), _e("marcus"), _e("tom")],
             _e("priya"), "Review Phoenix launch readiness and performance test results.",
         ),
         NormalizedMeeting(
-            "mtg-pay-steer", "Payments Migration steering", *slot(3), payments_team, _e("lena"),
+            "mtg-pay-steer", "Payments Migration steering", *steering, payments_team, _e("lena"),
             "Agree cutover approach for the payments migration.",
         ),
-        NormalizedMeeting("mtg-cfo", "1:1 with David (CFO)", *slot(5.5, 30), [LEADER_EMAIL, _e("david")], LEADER_EMAIL),
+        NormalizedMeeting("mtg-cfo", "1:1 with David (CFO)", *cfo, [LEADER_EMAIL, _e("david")], LEADER_EMAIL),
         NormalizedMeeting(
             "mtg-nw-qbr", "Northwind quarterly business review", ahead(1, 11), ahead(1, 12),
             [LEADER_EMAIL, _e("elena"), _e("priya")], _e("elena"), "Quarterly review with Northwind leadership.",
@@ -210,4 +253,8 @@ def build(now: datetime) -> SyncBatch:
     for sig in s:
         if sig.kind in {"email", "meeting_transcript"}:
             sig.visibility = "restricted"
+    # Early in the local day, "this morning" messages can't be in the future.
+    latest = now - timedelta(minutes=10)
+    for sig in s:
+        sig.occurred_at = min(sig.occurred_at, latest)
     return SyncBatch(signals=s, meetings=meetings, people=people, projects=projects)
