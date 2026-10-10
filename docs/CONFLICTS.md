@@ -78,3 +78,15 @@ Precedence: 04 Principles > 00 Vision > 01 PRD > 02 MVP Scope > 03 UX/UI Spec > 
 - **Artifacts:** `03_UX_UI_SPEC §4` lists Home's main sections as Needs Your Attention, Today, Decisions, Commitments, Waiting For, At Risk, Recent Changes; product-owner brief (2026-10-10) replaces them with Executive pulse, One thing needs your judgment, Your next moves, Today's moves, Watch, Recent changes, organised around *situations*.
 - **Conflict:** the new IA no longer shows the registers as separate Home sections. Their content is kept and regrouped (attention → judgment + next moves; today → today's moves; decisions/commitments/waiting for → situations, pulse, next moves; at risk → watch); every register stays in its module.
 - **Resolution (product owner, 2026-10-10):** **Approved.** Home sections are regrouped into situations, keeping the underlying information. Implemented per `docs/design/ROOK_HOME_UX_SPEC.md`. `docs/product/` is not edited; updating UX §4 is the owner's call.
+
+### C-011 — Context sources beyond Microsoft 365 in M3.5
+- **Artifacts:** 02_MVP_SCOPE lists Slack, Teams chat, documents (SharePoint/OneDrive) and Jira as P1/P2; the M3.5 brief (2026-10-10) names them as context sources.
+- **Resolution (product owner, 2026-10-10):** Approved as proposed. They appear in the Context Control Center as *available later* with no Connect action; real connectors are built only on separate approval.
+
+### C-012 — Topic continuity vs per-topic timelines (P1)
+- **Artifacts:** rook-context-graph marks per-topic timelines P1; the M3.5 brief asks for Topic Continuity.
+- **Resolution (product owner, 2026-10-10):** Approved as proposed. P0 delivers evidence-based continuity anchored on a meeting, decision or risk, built only from explicit source relationships, shared ids/threads, meeting references, linked work items, explicit document references and existing deterministic relationships. No LLM topic extraction and no semantic relationships in P0; unrelated records stay separate evidence.
+
+### C-013 — Milestone naming
+- **Artifacts:** `docs/MVP_PLAN.md` uses "M4" for the Microsoft 365 connector + Entra sign-in (code complete, awaiting live configuration); the product owner's "do not start M4" refers to the next milestone.
+- **Resolution (product owner, 2026-10-10):** This work is **M3.5**. The next milestone stays unstarted.

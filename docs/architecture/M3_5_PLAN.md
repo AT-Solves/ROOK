@@ -1,6 +1,7 @@
 # M3.5 — Product foundation: real identity, Context Control Center, meeting intelligence
 
-Status: **proposed — awaiting product-owner approval** (2026-10-10). Nothing in this plan is implemented yet.
+Status: **approved** (product owner, 2026-10-10): P0-1 … P0-7 and C-011 … C-013. Implemented in small PRs in the order below.
+Clarifications: Context is the primary concept but source provenance stays first-class (connected sources, account, permissions, data types, sync status/result, reconnect, disconnect); continuity uses explicit evidence only — never same project, same name or temporal proximity alone.
 Skills consulted: rook-security, rook-data, rook-connectors, rook-context-graph, rook-retrieval, rook-ai-eval, rook-ux, rook-quality.
 
 ## 1. What already exists (inspected)

@@ -70,51 +70,74 @@ export default function LoginPage() {
           {!providers && !loadError ? <p role="status" className="mt-6 text-sm text-muted">Connecting…</p> : null}
 
           {providers ? (
-            <div className="mt-7 rounded-[var(--radius-md)] border border-line bg-surface shadow-[var(--shadow-insight)]">
-              <section aria-labelledby="sso" className="px-7 pb-7 pt-6">
+            <>
+              <section aria-labelledby="sso" className="mt-7 rounded-[var(--radius-md)] border border-line bg-surface px-7 pb-7 pt-6 shadow-[var(--shadow-insight)]">
                 <h2 id="sso" className="flex items-center gap-2.5 text-[15px] font-semibold text-midnight">
                   <RookIcon name="lock" size={17} className="text-gold-deep" />
-                  Sign in with your organisation
+                  Sign in with your organization
                 </h2>
                 <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-                  Use your Microsoft 365 work account. ROOK only shows what you can already open in your own systems.
+                  Sign in with your organization&apos;s Microsoft account. ROOK uses only information your organization and your
+                  permissions allow it to access.
                 </p>
                 {ms?.configured ? (
                   <a className={`${ROOK_BUTTON.primary} mt-5 w-full py-3 text-[14px]`} href={`${API_BASE}${ms.login_url}?return_to=${encodeURIComponent(returnTo)}`}>
                     <RookMark tone="gold" size={18} />
-                    <span>Sign in with Microsoft</span>
+                    <span>Continue with Microsoft</span>
                   </a>
                 ) : (
-                  <p className="mt-5 border-l-2 border-gold bg-sunken px-4 py-3 text-[13px] leading-relaxed text-ink-soft">
-                    Microsoft sign-in isn&apos;t configured on this server yet. An administrator needs to complete the steps in
-                    docs/integrations/microsoft365.md.
-                  </p>
+                  <>
+                    {/* The capability stays visible; it is not available until an administrator configures it. */}
+                    <button
+                      type="button"
+                      disabled
+                      aria-describedby="sso-setup"
+                      className={`${ROOK_BUTTON.primary} mt-5 w-full py-3 text-[14px] disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      <RookMark tone="gold" size={18} />
+                      <span>Continue with Microsoft</span>
+                    </button>
+                    <div id="sso-setup" className="mt-4 border-l-2 border-gold bg-sunken px-4 py-3 text-[13px] leading-relaxed text-ink-soft">
+                      <p className="font-semibold text-midnight">Administrator setup required</p>
+                      <p className="mt-1">
+                        Microsoft sign-in isn&apos;t configured on this server yet. An administrator needs to register ROOK in Microsoft
+                        Entra ID and set its credentials on the server (docs/integrations/microsoft365.md).
+                      </p>
+                    </div>
+                  </>
                 )}
               </section>
+
               {providers.dev_login ? (
-                <section aria-labelledby="demo" className="border-t border-line bg-board/60 px-7 pb-7 pt-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 id="demo" className="text-[15px] font-semibold text-midnight">Demo workspace</h2>
-                    <span className="rook-caps rounded-[var(--radius-xs)] bg-midnight px-2 py-1 text-[10px] text-gold">Synthetic data</span>
-                  </div>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-muted">Explore ROOK with the Acme demo organisation. Disabled in shared environments.</p>
-                  <form onSubmit={devLogin} className="mt-4">
-                    <label htmlFor={emailId} className="block text-[12px] font-semibold text-ink-soft">Demo user email</label>
-                    <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
-                      <input
-                        id={emailId}
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-line-strong bg-surface px-3 py-2.5 text-sm text-midnight focus:border-gold-deep"
-                      />
-                      <RookButton type="submit" variant="secondary" icon="arrowRight" disabled={busy} className="py-2.5">{busy ? "Signing in…" : "Enter demo"}</RookButton>
-                    </div>
-                  </form>
-                </section>
+                <details className="group mt-5 rounded-[var(--radius-md)] border border-line bg-board/60 px-5 py-3.5 open:pb-5">
+                  <summary className="flex cursor-pointer select-none items-center justify-between gap-3 text-[13px] font-semibold text-ink-soft hover:text-midnight">
+                    <span className="inline-flex items-center gap-2">
+                      <RookIcon name="chevronRight" size={13} strokeWidth={2.2} className="rook-disclosure text-gold-deep" />
+                      Explore a synthetic workspace
+                    </span>
+                    <span className="text-[12px] font-normal text-muted">Uses synthetic data only.</span>
+                  </summary>
+                  <section aria-labelledby="demo" className="mt-3">
+                    <h2 id="demo" className="sr-only">Synthetic demo workspace</h2>
+                    <p className="text-[12px] leading-relaxed text-muted">The Acme demo organisation. Disabled in shared environments.</p>
+                    <form onSubmit={devLogin} className="mt-3">
+                      <label htmlFor={emailId} className="block text-[12px] font-semibold text-ink-soft">Demo user email</label>
+                      <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                        <input
+                          id={emailId}
+                          type="email"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-line-strong bg-surface px-3 py-2 text-sm text-midnight focus:border-gold-deep"
+                        />
+                        <RookButton type="submit" variant="secondary" icon="arrowRight" disabled={busy}>{busy ? "Signing in…" : "Enter demo"}</RookButton>
+                      </div>
+                    </form>
+                  </section>
+                </details>
               ) : null}
-            </div>
+            </>
           ) : null}
 
           <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-[12px] text-muted">

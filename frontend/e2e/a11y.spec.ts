@@ -13,8 +13,11 @@ async function audit(page: Page, name: string) {
 
 test("login screen", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Microsoft" })).toBeVisible();
   await audit(page, "login");
+  await page.getByText("Explore a synthetic workspace").click();
+  await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
+  await audit(page, "login: synthetic workspace open");
 });
 
 test("all P0 workspace screens", async ({ page }) => {

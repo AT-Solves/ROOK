@@ -4,6 +4,7 @@ export const API = "http://localhost:8000/api";
 
 export async function signIn(page: Page, email = "yamini@acme.example") {
   await page.goto("/login");
+  await page.getByText("Explore a synthetic workspace").click(); // the demo is a secondary, collapsed path
   await page.getByLabel("Demo user email").fill(email);
   await page.getByRole("button", { name: "Enter demo" }).click();
   await expect(page).toHaveURL("/");
