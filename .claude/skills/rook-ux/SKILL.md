@@ -25,7 +25,7 @@ Any frontend work, UI copy, or API shape decision driven by a screen.
   `evidence.tsx` (collapsed evidence), `states.tsx` (loading, empty, error, permission-denied), and
   `followup.tsx` (draft → explicit approval). See ADR-0007.
 - **Home** sections per UX §4 and MVP P0: Needs Attention, Today, Decisions, Commitments,
-  Waiting For, At Risk, Recent Changes. The header shows greeting, date and refresh state.
+  Waiting on others (C-009; UX §4 "Waiting For"), At Risk, Recent Changes. The header shows greeting, date and refresh state.
 - **Ask ROOK answers** are structured: direct answer, key points, recommended action, evidence,
   sources, and confidence when useful. No walls of text.
 - **Detail pages** (decision, commitment, risk, meeting) contain exactly the fields listed in UX

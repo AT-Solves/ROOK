@@ -61,7 +61,7 @@ export default function HomePage() {
                 </p>
               ) : null}
             </RookSection>
-            <RookSection title="Waiting for" id="h-waiting" count={b.waiting_for.length} more={{ href: "/commitments?tab=waiting", label: "All" }} icon="teams">
+            <RookSection title="Waiting on others" id="h-waiting" count={b.waiting_for.length} more={{ href: "/commitments?tab=waiting", label: "All" }} icon="teams">
               {b.waiting_for.length ? (
                 <ul className="space-y-3">{b.waiting_for.map((c) => <CommitmentCard key={c.id} c={c} showAction />)}</ul>
               ) : (
@@ -123,7 +123,7 @@ function Metrics({ b }: { b: Brief }) {
         <RookMetricCard value={b.counts.attention} label="Need your attention" href="#h-attention" icon="target" />
         <RookMetricCard value={b.counts.meetings_today} label="Meetings today" href="#h-today" icon="calendar" />
         <RookMetricCard value={b.counts.decisions_pending} label="Decisions pending" href="#h-decisions" icon="document" />
-        <RookMetricCard value={b.counts.waiting_for} label="Waiting for" href="#h-waiting" icon="teams" />
+        <RookMetricCard value={b.counts.waiting_for} label="Waiting on others" href="#h-waiting" icon="teams" />
         <RookMetricCard value={b.counts.risks} label="Open risks" href="#h-risks" icon="risk" />
       </div>
     </section>

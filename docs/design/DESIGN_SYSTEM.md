@@ -67,5 +67,5 @@ Desktop command centre (sidebar 264px, content ≤1120px, Home two columns at xl
 ## 9. Accessibility (WCAG 2.2 AA)
 Body text ≥ 7:1 on Board Light; on-dark text ≥ 7:1 on Midnight; trust-label text ≥ 7:1 on its tint. Focus: deep-gold outline on light, gold on dark (ask bar: gold border + glow). Meaning never by colour alone. `prefers-reduced-motion` disables transitions. Axe (wcag2a/aa, 21aa, 22aa) runs on every P0 screen in `e2e/a11y.spec.ts`.
 
-## 10. Open questions
-C-009: Home metric "Waiting for" vs requested "Waiting for you" (the count is what others owe the user).
+## 10. Terminology
+C-009 (resolved): the Home metric, Home section and Commitments tab are labelled "Waiting on others" (commitments others owe the user).

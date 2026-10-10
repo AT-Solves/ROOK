@@ -72,4 +72,4 @@ Precedence: 04 Principles > 00 Vision > 01 PRD > 02 MVP Scope > 03 UX/UI Spec > 
 - **Conflict:** "Waiting for you" reads as *items waiting on the user* — the opposite of what the number counts. Relabelling it would silently change what the metric means.
 - **Options:** (a) keep **Waiting for** (current; matches the UX spec and the Home section it links to); (b) use **Waiting on others** for clarity; (c) use **Waiting for you** and change the count to items blocked on the user (a product/API change).
 - **Recommendation:** (a). The visual rebuild ships with (a); no behaviour changed.
-- **Resolution:** open — awaiting product-owner decision.
+- **Resolution (product owner, 2026-10-10):** **"Waiting on others".** "Waiting for you" implies people are waiting for the leader; "Waiting on others" means the leader is waiting for another person, team or system. Terminology only — `counts.waiting_for` and the underlying data are unchanged. Applied to the Home metric, the matching Home section and the Commitments tab. Distinction kept: *Your commitments* = owned by the user; *Waiting on others* = commitments/dependencies the user is waiting for.

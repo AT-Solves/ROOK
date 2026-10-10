@@ -10,7 +10,7 @@ import { useApi } from "@/lib/useApi";
 
 const TABS = [
   { id: "mine", label: "Yours" },
-  { id: "waiting", label: "Waiting for" },
+  { id: "waiting", label: "Waiting on others" },
   { id: "proposed", label: "Suggested by ROOK" },
   { id: "done", label: "Done" },
 ] as const;

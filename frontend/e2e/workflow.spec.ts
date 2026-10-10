@@ -21,7 +21,7 @@ test("executive workflow: attention → meeting → evidence → ask → recomme
   await expect(page.getByRole("region", { name: /^Today/ }).getByRole("link", { name: "Phoenix Product Review" })).toBeVisible();
   await expect(page.getByRole("region", { name: /Decisions pending/ })).toContainText("Approve the Phoenix enterprise pricing tiers");
   await expect(page.getByRole("region", { name: /Your commitments/ })).toContainText("Northwind executive sponsor");
-  await expect(page.getByRole("region", { name: /Waiting for/ })).toContainText("Send the updated financial forecast");
+  await expect(page.getByRole("region", { name: /Waiting on others/ })).toContainText("Send the updated financial forecast");
   await expect(page.getByRole("region", { name: /At risk/ })).toContainText("Payments Migration");
 
   // 6. Open a meeting and understand its context
