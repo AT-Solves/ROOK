@@ -78,7 +78,7 @@ export function RookSourceLine({
         </Link>
         <p className="text-[12px] text-muted">{meta}</p>
         {quote ? (
-          <blockquote className="mt-1.5 border-l-2 border-gold pl-2.5 font-[family-name:var(--font-display)] text-[16px] italic leading-snug text-ink-soft">
+          <blockquote className="mt-1.5 border-l-2 border-gold pl-2.5 font-[family-name:var(--font-quote)] text-[16px] italic leading-snug text-ink-soft">
             “{quote}”
           </blockquote>
         ) : null}

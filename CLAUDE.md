@@ -21,6 +21,8 @@ Or `docker compose up --build` from the repo root (Postgres + API).
 Next.js 16 has breaking changes: read `frontend/AGENTS.md` and `frontend/node_modules/next/dist/docs/` before using framework APIs.
 ```
 cd frontend && npm ci
+npm run dev                                          # development: compiles each route on first visit (slower)
+npm run preview                                      # production build + start: fast, use for demos and reviews
 npm run lint && npm run typecheck && npm test        # ESLint, tsc, Vitest
 npm run build && PW_CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome npm run test:e2e   # Playwright + axe (starts API + web)
 CAPTURE_SCREENSHOTS=1 npx playwright test e2e/screenshots.spec.ts    # refresh docs/screenshots
