@@ -67,7 +67,7 @@ describe("Ask ROOK answer (UX §5)", () => {
 describe("navigation (UX §3, C-003)", () => {
   it("exposes only implemented MVP modules", () => {
     const labels = NAV.map((n) => n.label);
-    expect(labels).toEqual(["Home", "Ask ROOK", "Meetings", "Decisions", "Commitments", "Risks", "Sources"]);
+    expect(labels).toEqual(["Home", "Ask ROOK", "Meetings", "Decisions", "Commitments", "Risks", "Context"]);
     for (const hidden of ["Projects", "People", "Briefings", "Settings"]) expect(labels).not.toContain(hidden);
   });
 });

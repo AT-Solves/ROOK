@@ -48,6 +48,7 @@ class FakeM365:
         self.throttle_once = False
         self.transcripts_forbidden = False
         self.refreshes = 0
+        self.revoked = False  # the user revoked ROOK's access in Microsoft 365: Graph answers 401
 
     # -- Entra ID ------------------------------------------------------------------------
     def _token(self, request: httpx.Request) -> httpx.Response:
@@ -126,6 +127,8 @@ class FakeM365:
         assert url.host == "graph.microsoft.com", url
         path = url.path.removeprefix("/v1.0")
         self.graph_calls.append(path)
+        if self.revoked:
+            return httpx.Response(401, json={"error": {"code": "InvalidAuthenticationToken", "message": "revoked"}})
         if self.throttle_once:
             self.throttle_once = False
             return httpx.Response(429, headers={"Retry-After": "0"})

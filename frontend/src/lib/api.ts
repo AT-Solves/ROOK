@@ -9,6 +9,7 @@ import type {
   AskAnswer,
   Brief,
   Commitment,
+  ContextOverview,
   Decision,
   Me,
   Meeting,
@@ -132,6 +133,8 @@ export const api = {
 
   // ---------------------------------------------------------------- sources / evidence
   sources: () => request<SourceCatalogItem[]>("/sources"),
+  context: () => request<ContextOverview>("/context"),
+  disconnectSource: (id: number) => request<{ id: number; status: string }>(`/sources/${id}/disconnect`, { method: "POST" }),
   connectDelegated: (kind: string) => request<{ authorization_url: string }>(`/sources/${kind}/connect`, { method: "POST" }),
   syncSource: (id: number) => request<SyncReport>(`/sources/${id}/sync`, { method: "POST" }),
   signal: (id: number) => request<SignalDetail>(`/signals/${id}`),

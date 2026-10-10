@@ -7,7 +7,7 @@ import httpx
 
 from ...config import env, env_bool
 from ...models import utcnow
-from ..base import BaseConnector, ConnectorNotConfigured, OutboundMessage, SyncBatch
+from ..base import BaseConnector, ConnectorNotConfigured, DataType, OutboundMessage, SyncBatch
 from . import normalize
 from .graph import GraphClient, GraphError
 
@@ -34,13 +34,19 @@ def _iso(dt) -> str:
 
 class Microsoft365Connector(BaseConnector):
     kind = "microsoft365"
-    display_name = "Microsoft 365 (Outlook, Calendar, Teams meetings)"
+    display_name = "Microsoft 365"
     category = "communication"
     phase = 1
     delegated = True
     can_send = True
     required_env = ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT_ID")
     scopes = DATA_SCOPES
+    data_types = (
+        DataType("mail", "conversations", "Outlook mail", ("Mail.Read",)),
+        DataType("calendar", "meetings", "Calendar", ("Calendars.Read",)),
+        DataType("teams_transcripts", "transcripts", "Teams meeting transcripts",
+                 ("OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"), admin_consent=True),
+    )
     transport_override: httpx.BaseTransport | None = None  # tests inject a mock Graph here
 
     def __init__(self, config=None, context=None, transport: httpx.BaseTransport | None = None):
@@ -79,6 +85,9 @@ class Microsoft365Connector(BaseConnector):
         signals = [normalize.message_to_signal(m, owner) for m in messages]
         if env_bool("MICROSOFT_ENABLE_TRANSCRIPTS", True):
             signals += self._transcripts(graph, events, meetings, now)
+        else:
+            self.context.access_gaps["teams_transcripts"] = {
+                "status": "disabled", "reason": "Reading Teams transcripts is turned off on this ROOK server."}
         return SyncBatch(signals=signals, meetings=meetings, people=normalize.people_from(messages, events))
 
     def _transcripts(self, graph: GraphClient, events: list[dict], meetings, now) -> list:
@@ -103,6 +112,11 @@ class Microsoft365Connector(BaseConnector):
                     msg = f"Transcript unavailable for '{meeting.title}' ({exc.status}); continuing without it."
                     self.context.warnings.append(msg)
                     log.info(msg)
+                    if exc.status in (401, 403):
+                        self.context.access_gaps["teams_transcripts"] = {
+                            "status": "admin_required",
+                            "reason": f"Microsoft 365 refused access to meeting transcripts (HTTP {exc.status}). An "
+                                      "administrator must grant transcript access for your organization."}
                     continue
                 raise
         return out

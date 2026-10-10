@@ -4,7 +4,7 @@ from datetime import datetime
 
 from ..models import utcnow
 from . import demo_data
-from .base import BaseConnector, OutboundMessage, SyncBatch
+from .base import BaseConnector, DataType, OutboundMessage, SyncBatch
 
 
 class DemoConnector(BaseConnector):
@@ -15,6 +15,10 @@ class DemoConnector(BaseConnector):
     category = "communication"
     phase = 0
     can_send = True
+    synthetic = True
+    data_types = (DataType("calendar", "meetings", "Calendar"), DataType("email", "conversations", "Email"),
+                  DataType("chat", "conversations", "Chat"), DataType("transcripts", "transcripts", "Meeting transcripts"),
+                  DataType("work_items", "work_items", "Work items"))
 
     def sync(self, since: datetime | None) -> SyncBatch:
         # Meeting times are planned in the demo user's configured time zone (set at bootstrap).
@@ -32,6 +36,7 @@ class ManualConnector(BaseConnector):
     display_name = "Manual upload"
     category = "meetings"
     phase = 0
+    data_types = (DataType("uploads", "transcripts", "Uploaded transcripts and notes"),)
 
     def sync(self, since: datetime | None) -> SyncBatch:
         return SyncBatch()
