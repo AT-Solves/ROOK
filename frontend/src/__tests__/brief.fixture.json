@@ -1,0 +1,969 @@
+{
+ "greeting": "Good afternoon, Yamini",
+ "date": "Saturday, October 10",
+ "timezone": "Asia/Kolkata",
+ "generated_at": "2026-10-10T07:14:45.008711Z",
+ "headline": [
+  "6 items require your attention today.",
+  "1. Project Phoenix at risk: dependency delayed",
+  "2. Payments Migration: discussed repeatedly without a decision",
+  "3. Unowned escalation: Northwind data sync failures",
+  "You have 3 meetings today. 2 require preparation."
+ ],
+ "counts": {
+  "attention": 6,
+  "meetings_today": 3,
+  "prep_required": 2,
+  "decisions_pending": 1,
+  "my_commitments": 1,
+  "my_due_today": 0,
+  "waiting_for": 2,
+  "at_risk": 4,
+  "risks": 4,
+  "changes": 4,
+  "proposed": 2
+ },
+ "attention": [
+  {
+   "type": "risk",
+   "label": "Risk detected",
+   "title": "Project Phoenix at risk: dependency delayed",
+   "level": "high",
+   "confidence": "high",
+   "id": 2,
+   "why": "Decision D-1001 (\u201cLaunch Project Phoenix on October 21\u201d) was made in Product Leadership Meeting on Oct 6. Marcus Chen committed: \u201cEngineering will complete Phoenix performance testing by October 11\u201d (due Oct 11) \u2014 first stated in Microsoft Teams on Oct 6, confirmed in Outlook on Oct 7. It depends on the platform team's API release, which is now reported delayed \u2014 Slack #platform (Oct 9): \u201cHeads up: the API release for Phoenix is delayed.\u201d; Jira (Oct 9): \u201cStatus changed In Progress \u2192 Blocked.\u201d.",
+   "claim_type": "INFERENCE",
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "",
+     "note": "decision D-1001",
+     "url": "",
+     "authority": 0.8
+    },
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "",
+     "note": "commitment",
+     "url": "",
+     "authority": 0.8
+    },
+    {
+     "signal_id": 7,
+     "kind": "email",
+     "channel": "Outlook",
+     "title": "Re: Phoenix performance testing",
+     "author": "Marcus Chen",
+     "occurred_at": "2026-10-07T11:30:00Z",
+     "quote": "",
+     "note": "commitment",
+     "url": "",
+     "authority": 0.7
+    },
+    {
+     "signal_id": 8,
+     "kind": "message",
+     "channel": "Slack #platform",
+     "title": "Message in #platform",
+     "author": "Tom Becker",
+     "occurred_at": "2026-10-09T09:30:00Z",
+     "quote": "",
+     "note": "delay signal",
+     "url": "",
+     "authority": 0.4
+    },
+    {
+     "signal_id": 9,
+     "kind": "task_update",
+     "channel": "Jira",
+     "title": "PROJ-1842 \u00b7 Phoenix performance test environment",
+     "author": "Jira",
+     "occurred_at": "2026-10-09T12:30:00Z",
+     "quote": "",
+     "note": "delay signal",
+     "url": "https://jira.acme.example/browse/PROJ-1842",
+     "authority": 0.9
+    }
+   ],
+   "recommended_action": {
+    "text": "Ask Marcus for a recovery plan that protects D-1001 (Launch Project Phoenix on October 21) and a confirmed date for the platform team's API release. ROOK can draft the follow-up for your approval.",
+    "claim_type": "RECOMMENDATION",
+    "action": {
+     "type": "draft_followup",
+     "commitment_id": 3,
+     "risk_id": 2
+    }
+   }
+  },
+  {
+   "type": "risk",
+   "label": "Risk detected",
+   "title": "Payments Migration: discussed repeatedly without a decision",
+   "level": "high",
+   "confidence": "medium",
+   "id": 3,
+   "why": "Payments Migration has been discussed in 4 meetings over 2 weeks (Sep 19, Sep 26, Sep 30, Oct 4) without a recorded decision. Open items keep recurring in each transcript.",
+   "claim_type": "INFERENCE",
+   "evidence": [
+    {
+     "signal_id": 1,
+     "kind": "meeting_transcript",
+     "channel": "Google Meet",
+     "title": "Payments Migration sync \u2014 transcript",
+     "author": "Lena Park",
+     "occurred_at": "2026-09-19T10:30:00Z",
+     "quote": "",
+     "note": "meeting transcript",
+     "url": "",
+     "authority": 0.7
+    },
+    {
+     "signal_id": 2,
+     "kind": "meeting_transcript",
+     "channel": "Google Meet",
+     "title": "Payments Migration sync \u2014 transcript",
+     "author": "Lena Park",
+     "occurred_at": "2026-09-26T10:30:00Z",
+     "quote": "",
+     "note": "meeting transcript",
+     "url": "",
+     "authority": 0.7
+    },
+    {
+     "signal_id": 3,
+     "kind": "meeting_transcript",
+     "channel": "Google Meet",
+     "title": "Payments Migration sync \u2014 transcript",
+     "author": "Lena Park",
+     "occurred_at": "2026-09-30T10:30:00Z",
+     "quote": "",
+     "note": "meeting transcript",
+     "url": "",
+     "authority": 0.7
+    },
+    {
+     "signal_id": 4,
+     "kind": "meeting_transcript",
+     "channel": "Google Meet",
+     "title": "Payments Migration sync \u2014 transcript",
+     "author": "Lena Park",
+     "occurred_at": "2026-10-04T10:30:00Z",
+     "quote": "",
+     "note": "meeting transcript",
+     "url": "",
+     "authority": 0.7
+    }
+   ],
+   "recommended_action": {
+    "text": "Time-box the Payments Migration decision in Payments Migration steering (Oct 10): name a decision owner and a deadline, and list what information is still missing.",
+    "claim_type": "RECOMMENDATION",
+    "action": {
+     "type": "prepare_meeting",
+     "meeting_id": 8
+    }
+   }
+  },
+  {
+   "type": "risk",
+   "label": "Risk detected",
+   "title": "Unowned escalation: Northwind data sync failures",
+   "level": "high",
+   "confidence": "high",
+   "id": 4,
+   "why": "Elena Rossi raised a customer escalation on Oct 9 (Gmail) stating it has no owner. No commitment or owner has been detected since.",
+   "claim_type": "INFERENCE",
+   "evidence": [
+    {
+     "signal_id": 11,
+     "kind": "email",
+     "channel": "Gmail",
+     "title": "Customer escalation: Northwind data sync failures",
+     "author": "Elena Rossi",
+     "occurred_at": "2026-10-09T04:00:00Z",
+     "quote": "",
+     "note": "escalation",
+     "url": "",
+     "authority": 0.6
+    }
+   ],
+   "recommended_action": {
+    "text": "Assign an owner for this escalation and confirm a response time with Elena Rossi.",
+    "claim_type": "RECOMMENDATION",
+    "action": {
+     "type": "assign_owner",
+     "signal_id": 11
+    }
+   }
+  },
+  {
+   "type": "decision",
+   "label": "Decision required",
+   "title": "Approve the Phoenix enterprise pricing tiers before launch",
+   "level": "high",
+   "confidence": "medium",
+   "id": 2,
+   "why": "D-1002 is waiting for you. Raised as pending by Yamini Devasena in Product Leadership Meeting (Microsoft Teams, Oct 6).",
+   "claim_type": "FACT",
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "We need Yamini to approve the Phoenix enterprise pricing tiers before launch.",
+     "note": "",
+     "url": "",
+     "authority": 0.8
+    },
+    {
+     "signal_id": 10,
+     "kind": "email",
+     "channel": "Gmail",
+     "title": "Phoenix pricing \u2014 decision needed",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-10T02:10:00Z",
+     "quote": "Yamini, a decision is needed on the Phoenix enterprise pricing tiers before Thursday so sales collateral can ship.",
+     "note": "corroborating source",
+     "url": "",
+     "authority": 0.6
+    }
+   ],
+   "recommended_action": {
+    "text": "Decide: Approve the Phoenix enterprise pricing tiers before launch",
+    "claim_type": "RECOMMENDATION",
+    "action": {
+     "type": "decide",
+     "decision_id": 2
+    }
+   }
+  },
+  {
+   "type": "commitment",
+   "label": "Follow-up overdue",
+   "title": "Sarah Okafor: Send the updated financial forecast by Friday",
+   "level": "medium",
+   "confidence": "high",
+   "id": 4,
+   "why": "Due Oct 9. Past its due date and no completion signal has been detected.",
+   "claim_type": "INFERENCE",
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "I'll send the updated financial forecast by Friday.",
+     "note": "",
+     "url": "",
+     "authority": 0.8
+    }
+   ],
+   "recommended_action": {
+    "text": "Follow up with Sarah; ROOK can draft it for your approval.",
+    "claim_type": "RECOMMENDATION",
+    "action": {
+     "type": "draft_followup",
+     "commitment_id": 4
+    }
+   }
+  },
+  {
+   "type": "commitment",
+   "label": "Your commitment",
+   "title": "Speak with the Northwind executive sponsor about the launch plan by October 12",
+   "level": "medium",
+   "confidence": "high",
+   "id": 5,
+   "why": "You committed to this; due Oct 12.",
+   "claim_type": "FACT",
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "I'll speak with the Northwind executive sponsor about the launch plan by October 12.",
+     "note": "",
+     "url": "",
+     "authority": 0.8
+    }
+   ],
+   "recommended_action": null
+  }
+ ],
+ "today": [
+  {
+   "id": 6,
+   "title": "Executive staff stand-up",
+   "purpose": "Weekly staff alignment.",
+   "starts_at": "2026-10-10T03:00:00Z",
+   "ends_at": "2026-10-10T03:30:00Z",
+   "attendees": [
+    "yamini@acme.example",
+    "priya@acme.example",
+    "marcus@acme.example",
+    "sarah@acme.example",
+    "elena@acme.example"
+   ],
+   "organizer": "yamini@acme.example",
+   "project_id": null,
+   "project": null,
+   "prep_required": true,
+   "prep_reasons": [
+    "1 overdue commitment"
+   ],
+   "past": true
+  },
+  {
+   "id": 7,
+   "title": "Phoenix Product Review",
+   "purpose": "Review Phoenix launch readiness and performance test results.",
+   "starts_at": "2026-10-10T08:00:00Z",
+   "ends_at": "2026-10-10T09:00:00Z",
+   "attendees": [
+    "yamini@acme.example",
+    "priya@acme.example",
+    "marcus@acme.example",
+    "tom@acme.example"
+   ],
+   "organizer": "priya@acme.example",
+   "project_id": 1,
+   "project": "Project Phoenix",
+   "prep_required": true,
+   "prep_reasons": [
+    "1 open risk",
+    "1 pending decision"
+   ],
+   "past": false
+  },
+  {
+   "id": 8,
+   "title": "Payments Migration steering",
+   "purpose": "Agree cutover approach for the payments migration.",
+   "starts_at": "2026-10-10T11:00:00Z",
+   "ends_at": "2026-10-10T12:00:00Z",
+   "attendees": [
+    "yamini@acme.example",
+    "lena@acme.example",
+    "tom@acme.example",
+    "marcus@acme.example"
+   ],
+   "organizer": "lena@acme.example",
+   "project_id": 2,
+   "project": "Payments Migration",
+   "prep_required": true,
+   "prep_reasons": [
+    "1 open risk"
+   ],
+   "past": false
+  }
+ ],
+ "decisions_pending": [
+  {
+   "id": 2,
+   "code": "D-1002",
+   "statement": "Approve the Phoenix enterprise pricing tiers before launch",
+   "owner": "Yamini Devasena",
+   "rationale": "",
+   "status": "pending",
+   "confidence": "medium",
+   "decided_at": "2026-10-06T05:30:00Z",
+   "project_id": 1,
+   "project": "Project Phoenix",
+   "meeting_id": 5,
+   "participants": [
+    "Yamini Devasena",
+    "Priya Shah",
+    "Marcus Chen",
+    "Sarah Okafor",
+    "Elena Rossi"
+   ],
+   "context": "Product Leadership Meeting (Microsoft Teams, Oct 6)",
+   "needs_me": true,
+   "claim_type": "FACT",
+   "basis": "Raised as pending by Yamini Devasena in Product Leadership Meeting (Microsoft Teams, Oct 6)",
+   "related_commitments": [],
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "We need Yamini to approve the Phoenix enterprise pricing tiers before launch.",
+     "note": "",
+     "url": "",
+     "authority": 0.8
+    },
+    {
+     "signal_id": 10,
+     "kind": "email",
+     "channel": "Gmail",
+     "title": "Phoenix pricing \u2014 decision needed",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-10T02:10:00Z",
+     "quote": "Yamini, a decision is needed on the Phoenix enterprise pricing tiers before Thursday so sales collateral can ship.",
+     "note": "corroborating source",
+     "url": "",
+     "authority": 0.6
+    }
+   ]
+  }
+ ],
+ "my_commitments": [
+  {
+   "id": 5,
+   "owner": "Yamini Devasena",
+   "owner_email": "yamini@acme.example",
+   "description": "Speak with the Northwind executive sponsor about the launch plan by October 12",
+   "due_date": "2026-10-12",
+   "kind": "explicit",
+   "status": "open",
+   "confidence": "high",
+   "project_id": 4,
+   "project": "Northwind Account",
+   "mine": true,
+   "claim_type": "FACT",
+   "basis": "Stated by Yamini Devasena in Product Leadership Meeting (Microsoft Teams, Oct 6)",
+   "status_claim_type": "FACT",
+   "status_basis": "",
+   "related_decision": null,
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "I'll speak with the Northwind executive sponsor about the launch plan by October 12.",
+     "note": "",
+     "url": "",
+     "authority": 0.8
+    }
+   ]
+  }
+ ],
+ "waiting_for": [
+  {
+   "id": 3,
+   "owner": "Marcus Chen",
+   "owner_email": "marcus@acme.example",
+   "description": "Engineering will complete Phoenix performance testing by October 11",
+   "due_date": "2026-10-11",
+   "kind": "explicit",
+   "status": "open",
+   "confidence": "high",
+   "project_id": 1,
+   "project": "Project Phoenix",
+   "mine": false,
+   "claim_type": "FACT",
+   "basis": "Stated by Marcus Chen in Product Leadership Meeting (Microsoft Teams, Oct 6)",
+   "status_claim_type": "FACT",
+   "status_basis": "",
+   "related_decision": {
+    "id": 1,
+    "code": "D-1001",
+    "statement": "Launch Project Phoenix on October 21",
+    "basis": "Committed in the same discussion where D-1001 was decided.",
+    "claim_type": "FACT"
+   },
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "Engineering will complete Phoenix performance testing by October 11.",
+     "note": "",
+     "url": "",
+     "authority": 0.8
+    },
+    {
+     "signal_id": 7,
+     "kind": "email",
+     "channel": "Outlook",
+     "title": "Re: Phoenix performance testing",
+     "author": "Marcus Chen",
+     "occurred_at": "2026-10-07T11:30:00Z",
+     "quote": "Confirming from the leadership meeting: Engineering will complete Phoenix performance testing by October 11.",
+     "note": "confirmed in another channel",
+     "url": "",
+     "authority": 0.7
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "owner": "Sarah Okafor",
+   "owner_email": "sarah@acme.example",
+   "description": "Send the updated financial forecast by Friday",
+   "due_date": "2026-10-09",
+   "kind": "explicit",
+   "status": "overdue",
+   "confidence": "high",
+   "project_id": 3,
+   "project": "Q4 Financial Plan",
+   "mine": false,
+   "claim_type": "FACT",
+   "basis": "Stated by Sarah Okafor in Product Leadership Meeting (Microsoft Teams, Oct 6)",
+   "status_claim_type": "INFERENCE",
+   "status_basis": "Past its due date and no completion signal has been detected.",
+   "related_decision": null,
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "I'll send the updated financial forecast by Friday.",
+     "note": "",
+     "url": "",
+     "authority": 0.8
+    }
+   ]
+  }
+ ],
+ "proposed": [
+  {
+   "id": 2,
+   "owner": "Unassigned",
+   "owner_email": "",
+   "description": "Check the legacy processor contract end date",
+   "due_date": null,
+   "kind": "inferred",
+   "status": "proposed",
+   "confidence": "low",
+   "project_id": 2,
+   "project": "Payments Migration",
+   "mine": false,
+   "claim_type": "INFERENCE",
+   "basis": "Inferred from Payments Migration sync (Google Meet, Sep 30)",
+   "status_claim_type": "FACT",
+   "status_basis": "",
+   "related_decision": null,
+   "evidence": [
+    {
+     "signal_id": 3,
+     "kind": "meeting_transcript",
+     "channel": "Google Meet",
+     "title": "Payments Migration sync \u2014 transcript",
+     "author": "Lena Park",
+     "occurred_at": "2026-09-30T10:30:00Z",
+     "quote": "Someone probably needs to check the legacy processor contract end date.",
+     "note": "",
+     "url": "",
+     "authority": 0.7
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "owner": "Unassigned",
+   "owner_email": "",
+   "description": "Investigate the Phoenix API rate limits",
+   "due_date": null,
+   "kind": "inferred",
+   "status": "proposed",
+   "confidence": "low",
+   "project_id": 1,
+   "project": "Project Phoenix",
+   "mine": false,
+   "claim_type": "INFERENCE",
+   "basis": "Inferred from Product Leadership Meeting (Microsoft Teams, Oct 6)",
+   "status_claim_type": "FACT",
+   "status_basis": "",
+   "related_decision": {
+    "id": 1,
+    "code": "D-1001",
+    "statement": "Launch Project Phoenix on October 21",
+    "basis": "Committed in the same discussion where D-1001 was decided.",
+    "claim_type": "FACT"
+   },
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "Someone probably needs to investigate the Phoenix API rate limits.",
+     "note": "",
+     "url": "",
+     "authority": 0.8
+    }
+   ]
+  }
+ ],
+ "risks": [
+  {
+   "id": 2,
+   "title": "Project Phoenix at risk: dependency delayed",
+   "explanation": "Decision D-1001 (\u201cLaunch Project Phoenix on October 21\u201d) was made in Product Leadership Meeting on Oct 6. Marcus Chen committed: \u201cEngineering will complete Phoenix performance testing by October 11\u201d (due Oct 11) \u2014 first stated in Microsoft Teams on Oct 6, confirmed in Outlook on Oct 7. It depends on the platform team's API release, which is now reported delayed \u2014 Slack #platform (Oct 9): \u201cHeads up: the API release for Phoenix is delayed.\u201d; Jira (Oct 9): \u201cStatus changed In Progress \u2192 Blocked.\u201d.",
+   "level": "high",
+   "confidence": "high",
+   "status": "open",
+   "rule": "dependency_delay",
+   "project_id": 1,
+   "project": "Project Phoenix",
+   "detected_at": "2026-10-10T07:14:41.579306Z",
+   "claim_type": "INFERENCE",
+   "basis": "Detected by rule 'dependency_delay' from 5 source(s).",
+   "recommended_action": {
+    "text": "Ask Marcus for a recovery plan that protects D-1001 (Launch Project Phoenix on October 21) and a confirmed date for the platform team's API release. ROOK can draft the follow-up for your approval.",
+    "claim_type": "RECOMMENDATION",
+    "action": {
+     "type": "draft_followup",
+     "commitment_id": 3,
+     "risk_id": 2
+    }
+   },
+   "related": {
+    "commitments": [
+     3
+    ],
+    "decisions": [
+     1
+    ]
+   },
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "",
+     "note": "decision D-1001",
+     "url": "",
+     "authority": 0.8
+    },
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "",
+     "note": "commitment",
+     "url": "",
+     "authority": 0.8
+    },
+    {
+     "signal_id": 7,
+     "kind": "email",
+     "channel": "Outlook",
+     "title": "Re: Phoenix performance testing",
+     "author": "Marcus Chen",
+     "occurred_at": "2026-10-07T11:30:00Z",
+     "quote": "",
+     "note": "commitment",
+     "url": "",
+     "authority": 0.7
+    },
+    {
+     "signal_id": 8,
+     "kind": "message",
+     "channel": "Slack #platform",
+     "title": "Message in #platform",
+     "author": "Tom Becker",
+     "occurred_at": "2026-10-09T09:30:00Z",
+     "quote": "",
+     "note": "delay signal",
+     "url": "",
+     "authority": 0.4
+    },
+    {
+     "signal_id": 9,
+     "kind": "task_update",
+     "channel": "Jira",
+     "title": "PROJ-1842 \u00b7 Phoenix performance test environment",
+     "author": "Jira",
+     "occurred_at": "2026-10-09T12:30:00Z",
+     "quote": "",
+     "note": "delay signal",
+     "url": "https://jira.acme.example/browse/PROJ-1842",
+     "authority": 0.9
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "title": "Payments Migration: discussed repeatedly without a decision",
+   "explanation": "Payments Migration has been discussed in 4 meetings over 2 weeks (Sep 19, Sep 26, Sep 30, Oct 4) without a recorded decision. Open items keep recurring in each transcript.",
+   "level": "high",
+   "confidence": "medium",
+   "status": "open",
+   "rule": "unresolved_discussion",
+   "project_id": 2,
+   "project": "Payments Migration",
+   "detected_at": "2026-10-10T07:14:41.579306Z",
+   "claim_type": "INFERENCE",
+   "basis": "Detected by rule 'unresolved_discussion' from 4 source(s).",
+   "recommended_action": {
+    "text": "Time-box the Payments Migration decision in Payments Migration steering (Oct 10): name a decision owner and a deadline, and list what information is still missing.",
+    "claim_type": "RECOMMENDATION",
+    "action": {
+     "type": "prepare_meeting",
+     "meeting_id": 8
+    }
+   },
+   "related": {
+    "commitments": [
+     2
+    ],
+    "decisions": []
+   },
+   "evidence": [
+    {
+     "signal_id": 1,
+     "kind": "meeting_transcript",
+     "channel": "Google Meet",
+     "title": "Payments Migration sync \u2014 transcript",
+     "author": "Lena Park",
+     "occurred_at": "2026-09-19T10:30:00Z",
+     "quote": "",
+     "note": "meeting transcript",
+     "url": "",
+     "authority": 0.7
+    },
+    {
+     "signal_id": 2,
+     "kind": "meeting_transcript",
+     "channel": "Google Meet",
+     "title": "Payments Migration sync \u2014 transcript",
+     "author": "Lena Park",
+     "occurred_at": "2026-09-26T10:30:00Z",
+     "quote": "",
+     "note": "meeting transcript",
+     "url": "",
+     "authority": 0.7
+    },
+    {
+     "signal_id": 3,
+     "kind": "meeting_transcript",
+     "channel": "Google Meet",
+     "title": "Payments Migration sync \u2014 transcript",
+     "author": "Lena Park",
+     "occurred_at": "2026-09-30T10:30:00Z",
+     "quote": "",
+     "note": "meeting transcript",
+     "url": "",
+     "authority": 0.7
+    },
+    {
+     "signal_id": 4,
+     "kind": "meeting_transcript",
+     "channel": "Google Meet",
+     "title": "Payments Migration sync \u2014 transcript",
+     "author": "Lena Park",
+     "occurred_at": "2026-10-04T10:30:00Z",
+     "quote": "",
+     "note": "meeting transcript",
+     "url": "",
+     "authority": 0.7
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "title": "Unowned escalation: Northwind data sync failures",
+   "explanation": "Elena Rossi raised a customer escalation on Oct 9 (Gmail) stating it has no owner. No commitment or owner has been detected since.",
+   "level": "high",
+   "confidence": "high",
+   "status": "open",
+   "rule": "unowned_escalation",
+   "project_id": 4,
+   "project": "Northwind Account",
+   "detected_at": "2026-10-10T07:14:41.579306Z",
+   "claim_type": "INFERENCE",
+   "basis": "Detected by rule 'unowned_escalation' from 1 source(s).",
+   "recommended_action": {
+    "text": "Assign an owner for this escalation and confirm a response time with Elena Rossi.",
+    "claim_type": "RECOMMENDATION",
+    "action": {
+     "type": "assign_owner",
+     "signal_id": 11
+    }
+   },
+   "related": {
+    "commitments": [],
+    "decisions": []
+   },
+   "evidence": [
+    {
+     "signal_id": 11,
+     "kind": "email",
+     "channel": "Gmail",
+     "title": "Customer escalation: Northwind data sync failures",
+     "author": "Elena Rossi",
+     "occurred_at": "2026-10-09T04:00:00Z",
+     "quote": "",
+     "note": "escalation",
+     "url": "",
+     "authority": 0.6
+    }
+   ]
+  },
+  {
+   "id": 1,
+   "title": "Overdue: Sarah Okafor \u2014 Send the updated financial forecast by Friday",
+   "explanation": "Sarah Okafor committed to \u201cSend the updated financial forecast by Friday\u201d in Product Leadership Meeting (Microsoft Teams, Oct 6). It was due Oct 9 (1 day ago) and no completion signal has been detected since.",
+   "level": "medium",
+   "confidence": "high",
+   "status": "open",
+   "rule": "overdue_commitment",
+   "project_id": 3,
+   "project": "Q4 Financial Plan",
+   "detected_at": "2026-10-10T07:14:41.579306Z",
+   "claim_type": "INFERENCE",
+   "basis": "Detected by rule 'overdue_commitment' from 1 source(s).",
+   "recommended_action": {
+    "text": "Ask Sarah for status and a new date for \u201cSend the updated financial forecast by Friday\u201d. ROOK can draft the follow-up for your approval.",
+    "claim_type": "RECOMMENDATION",
+    "action": {
+     "type": "draft_followup",
+     "commitment_id": 4,
+     "risk_id": 1
+    }
+   },
+   "related": {
+    "commitments": [
+     4
+    ],
+    "decisions": []
+   },
+   "evidence": [
+    {
+     "signal_id": 6,
+     "kind": "meeting_transcript",
+     "channel": "Microsoft Teams",
+     "title": "Product Leadership Meeting \u2014 transcript",
+     "author": "Priya Shah",
+     "occurred_at": "2026-10-06T05:30:00Z",
+     "quote": "",
+     "note": "commitment source",
+     "url": "",
+     "authority": 0.8
+    }
+   ]
+  }
+ ],
+ "changes": [
+  {
+   "signal_id": 10,
+   "kind": "email",
+   "channel": "Gmail",
+   "title": "Phoenix pricing \u2014 decision needed",
+   "author": "Priya Shah",
+   "occurred_at": "2026-10-10T02:10:00Z",
+   "quote": "",
+   "note": "",
+   "url": "",
+   "authority": 0.6,
+   "derived": [
+    "decision (corroborating source)"
+   ],
+   "summary": "Yamini, a decision is needed on the Phoenix enterprise pricing tiers before Thursday so sales collateral can ship",
+   "claim_type": "FACT"
+  },
+  {
+   "signal_id": 9,
+   "kind": "task_update",
+   "channel": "Jira",
+   "title": "PROJ-1842 \u00b7 Phoenix performance test environment",
+   "author": "Jira",
+   "occurred_at": "2026-10-09T12:30:00Z",
+   "quote": "",
+   "note": "",
+   "url": "https://jira.acme.example/browse/PROJ-1842",
+   "authority": 0.9,
+   "derived": [
+    "risk (delay signal)"
+   ],
+   "summary": "PROJ-1842 \u00b7 Phoenix performance test environment \u2014 Status changed In Progress \u2192 Blocked",
+   "claim_type": "FACT"
+  },
+  {
+   "signal_id": 8,
+   "kind": "message",
+   "channel": "Slack #platform",
+   "title": "Message in #platform",
+   "author": "Tom Becker",
+   "occurred_at": "2026-10-09T09:30:00Z",
+   "quote": "",
+   "note": "",
+   "url": "",
+   "authority": 0.4,
+   "derived": [
+    "risk (delay signal)"
+   ],
+   "summary": "Heads up: the API release for Phoenix is delayed",
+   "claim_type": "FACT"
+  },
+  {
+   "signal_id": 11,
+   "kind": "email",
+   "channel": "Gmail",
+   "title": "Customer escalation: Northwind data sync failures",
+   "author": "Elena Rossi",
+   "occurred_at": "2026-10-09T04:00:00Z",
+   "quote": "",
+   "note": "",
+   "url": "",
+   "authority": 0.6,
+   "derived": [
+    "risk (escalation)"
+   ],
+   "summary": "Northwind reports intermittent data sync failures in production since yesterday morning",
+   "claim_type": "FACT"
+  }
+ ],
+ "people": [
+  {
+   "name": "Sarah Okafor",
+   "email": "sarah@acme.example",
+   "title": "Finance Director",
+   "last_interaction": "2026-10-10T03:30:00Z",
+   "days_since": 0,
+   "reasons": [
+    "1 overdue commitment to you"
+   ]
+  },
+  {
+   "name": "David Kim",
+   "email": "david@acme.example",
+   "title": "Chief Financial Officer",
+   "last_interaction": "2026-09-22T04:30:00Z",
+   "days_since": 18,
+   "reasons": [
+    "No interaction in 18 days",
+    "Meeting: 1:1 with David (CFO) 10:00"
+   ]
+  }
+ ]
+}

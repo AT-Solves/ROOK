@@ -21,7 +21,7 @@ export const MVP_QUESTIONS = [
   "What is at risk?",
 ];
 
-export function AskForm({ onAnswer, compact = false }: { onAnswer: (a: AskAnswer) => void; compact?: boolean }) {
+export function AskForm({ onAnswer, compact = false, placeholder }: { onAnswer: (a: AskAnswer) => void; compact?: boolean; placeholder?: string }) {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +50,7 @@ export function AskForm({ onAnswer, compact = false }: { onAnswer: (a: AskAnswer
         onSubmit={() => submit(q)}
         busy={busy}
         size={compact ? "standard" : "hero"}
+        placeholder={placeholder}
       />
       {!compact ? (
         <div className="mt-4">

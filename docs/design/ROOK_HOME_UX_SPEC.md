@@ -1,6 +1,7 @@
 # ROOK Home — Executive Command Center (UX spec)
 
-Status: **proposed — awaiting product-owner approval before implementation** (2026-10-10).
+Status: **approved and implemented** (2026-10-10). D-1 to D-4 and C-010 approved by the product owner.
+Code: `frontend/src/app/(workspace)/page.tsx`, `frontend/src/components/home/`, view model `frontend/src/lib/situations.ts`.
 Scope: frontend information architecture and presentation of Home only. No backend, API, data, auth, permission, trust,
 evidence, audit or follow-up-approval change. Related: `03_UX_UI_SPEC §4` (see C-010), `DESIGN_SYSTEM.md`, ADR-0008.
 
@@ -86,7 +87,7 @@ View-model logic lives in `frontend/src/lib/situations.ts` (pure functions, unit
 | Pulse: Decisions | `brief.counts.decisions_pending` | → `/decisions?tab=pending`. |
 | Pulse: Waiting | `brief.counts.waiting_for` | → `/commitments?tab=waiting`. |
 | Pulse: Watch | `brief.counts.risks` (open risks ROOK is monitoring) | → scrolls to *Watch*. |
-| **Situation** grouping | `brief.risks[]`, `decisions_pending[]`, `waiting_for[]`, `my_commitments[]` grouped by `project_id`; `attention[]` items resolved to those records by `type`+`id` | Records without a project become their own situation. |
+| **Situation** grouping | `brief.risks[]`, `decisions_pending[]`, `waiting_for[]`, `my_commitments[]` joined **only through relationships the API states**: `risk.related.decisions/commitments`, `commitment.related_decision`, `decision.related_commitments`; `attention[]` items resolved to those records by `type`+`id` | Sharing a project is shown as context but never merges records (owner direction). Ids that do not resolve to a visible record are ignored. |
 | Situation relationships | `risk.related.decisions/commitments` ids; full records from `GET /api/risks/{id}` → `related_decisions`, `related_commitments` (permission-filtered) | Fetched for the primary situation only, after first paint. |
 | FACT line (what changed) | `brief.changes[]` whose `signal_id` is in the situation's risk `evidence[].signal_id` → `summary` (`claim_type: FACT`) | Facts come from the source; never paraphrased into an inference. |
 | INFERENCE line (why it matters) | `risk.title` / `risk.explanation` (`claim_type: INFERENCE`), clamped to one line; full text under "View situation" | |
@@ -122,6 +123,10 @@ type Situation = {
 Ties keep the backend's attention order. On today's demo data this selects **Project Phoenix** (high-severity
 dependency risk, decision D-1001, pending decision D-1002, Marcus Chen's commitment, actionable recommendation).
 Nothing is hard-coded to Phoenix.
+
+**Relationship rule.** Records join a situation only through a relationship the API states. With today's data, the Phoenix
+risk joins Marcus Chen's commitment and decision D-1001; the pricing decision D-1002 shares the project but has no stated
+link to the risk, so it stays separate (it appears as its own Next move).
 
 **Duplicate rule.** A record appears in exactly one situation. The judgment card shows the top situation; Next moves,
 Watch and Today's moves reference situations by name in one line each, never as a second large card.
@@ -182,7 +187,7 @@ order; focus rings visible on dark (gold) and light (deep gold). Chessboard head
 9. WCAG 2.2 AA (axe: no serious/critical); all existing tests green; new unit tests for `situations.ts`
    (grouping, ranking, duplicate suppression, watch status, next moves) and E2E for the new regions.
 
-## 11. Decisions needed from the product owner
+## 11. Product-owner decisions (approved 2026-10-10)
 
 - **D-1 — UNKNOWN on Home.** The only UNKNOWN claims live in Ask ROOK, and every Ask call writes an `ask` audit record.
   Calling it automatically on Home would record questions the user never asked.
@@ -197,3 +202,16 @@ order; focus rings visible on dark (gold) and light (deep gold). Chessboard head
   demo data (launch October 21, meetings: Phoenix Product Review, Payments Migration steering). Home will show only real data.
 - **C-010** — this IA supersedes the section list in `03_UX_UI_SPEC §4`; all of its content is kept but regrouped. Logged in
   `docs/CONFLICTS.md`; `docs/product/` is not edited.
+
+## 12. Screenshots
+
+`docs/screenshots/01-home-1440x900.png`, `01-home-1280x800.png`, `01-home.png` (full page), `14-home-tablet.png`,
+`15-home-mobile.png`, `18-home-situation-expanded.png`, `19-home-no-critical-situation.png`, `20-home-watch.png`.
+
+## 13. Known limitations
+
+- UNKNOWN claims appear on Home only through **See full briefing** (D-1); the brief API has none.
+- "Dependency" is shown as the sources the risk rule cites as delay signals; ROOK does not extract a named dependency entity.
+- The evidence count on a situation counts distinct sources across its records, so it can differ from a single record's count.
+- `risk.related` exposes raw related ids in the existing API (ids only, no content). Home never shows or counts an id that does
+  not resolve to a record the user can see.

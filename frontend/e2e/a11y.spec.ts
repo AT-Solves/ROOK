@@ -19,7 +19,10 @@ test("login screen", async ({ page }) => {
 
 test("all P0 workspace screens", async ({ page }) => {
   await signIn(page);
+  await page.waitForLoadState("networkidle");
   await audit(page, "home");
+  await page.getByRole("button", { name: "See situation" }).click();
+  await audit(page, "home: situation expanded");
 
   await page.goto("/ask");
   await page.getByRole("button", { name: "What changed and what should I do?" }).click();
