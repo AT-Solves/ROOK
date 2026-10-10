@@ -75,7 +75,7 @@ export function RookSidebar({ nav, profile }: { nav: ReactNode; profile: ReactNo
     <aside className="rook-dark relative bg-midnight text-on-dark-soft md:border-r md:border-slate-line">
       <div className="md:sticky md:top-0 md:flex md:h-screen md:flex-col">
         <div className="relative overflow-hidden px-4 pb-3 pt-4 md:px-6 md:pb-6 md:pt-8">
-          <RookChessPattern tone="dark" fade="down" />
+          <RookChessPattern variant="dark" fade="down" opacity={0.7} />
           <Link href="/" aria-label="ROOK — Home" className="relative inline-flex rounded-[var(--radius-sm)]">
             <RookLogo tone="dark" size="md" />
           </Link>

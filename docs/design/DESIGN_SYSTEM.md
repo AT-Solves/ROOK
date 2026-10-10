@@ -20,8 +20,18 @@ No pale-blue theme, no purple brand, no decorative gradients.
 `RookMark`: a geometric rook in separated bands (crown, chamfer, tower with arrow slit, collar, plinth). Gold gradient on Midnight; solid Midnight on light. Always full strength, never low-opacity, never a Unicode glyph.
 `RookLogo`: mark + Cinzel wordmark (Board Light on dark, Midnight on light), optional "Your AI Chief of Staff" and the tagline "Context for higher judgment" with a gold rule. `stacked` for login/splash. Favicon: `app/icon.svg`.
 
-## 4. Chessboard texture
-`RookChessPattern tone="dark|light" fade="right|left|down|radial|none"`: a CSS checkerboard (44px squares). Dark: Slate on Midnight; light: warm gray at 5.5% on Board Light. Always faded and decorative. Used in the sidebar brand area, every page header and the Home hero, login, and empty/loading states.
+## 4. Chessboard
+`RookChessPattern variant="dark|light|hero" fade="right|left|down|radial|none" opacity square` — a true two-colour board drawn in CSS (no images), crisp squares.
+| Variant | Square A | Square B | Scale | Use |
+|---|---|---|---|---|
+| `dark` | Midnight `#0B1220` | Slate `#1E293B` | 44px | sidebar brand area, page headers / Home hero (faded, 0.7–0.8) |
+| `light` | Board Light `#F8F7F4` | `#E7E2D8` | 44px | empty and loading states, login workspace side |
+| `hero` | Midnight `#0B1220` | Slate `#1E293B` | 64px desktop, 40px phone | login brand panel: unmistakably a board |
+
+Depth on hero surfaces: board → Midnight vignette (legibility) → logo and message → `RookHeroPiece`, a large sculpted gold rook with a contact shadow.
+
+## 4a. Login
+Split screen: 55% Midnight brand panel (hero board, logo, "Your AI Chief of Staff", CONTEXT FOR HIGHER JUDGMENT with a thin gold rule, the brand statement in warm ivory, the hero rook) and 45% Board Light sign-in (eyebrow, "Sign in to ROOK", subtitle, one ivory card holding Microsoft sign-in and the demo workspace, trust line). Tablet 45/55. Phone: compact board header with logo and rook, then sign-in.
 
 ## 5. Typography
 | Role | Font | Use |

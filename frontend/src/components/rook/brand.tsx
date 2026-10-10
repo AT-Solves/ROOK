@@ -114,3 +114,57 @@ export function RookTagline({ tone = "dark", center = false }: { tone?: RookTone
     </span>
   );
 }
+
+/**
+ * Hero rook — a large sculpted rook for brand moments (login). Same silhouette as RookMark, rendered with a
+ * horizontal light-to-shade gradient so it reads as a turned, three-dimensional gold piece, with a rim highlight
+ * and a soft contact shadow. Vector only; decorative.
+ */
+export function RookHeroPiece({ className = "" }: { className?: string }) {
+  const id = `rook-hero-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return (
+    <svg viewBox="0 0 200 310" className={className} aria-hidden focusable="false">
+      <defs>
+        <linearGradient id={`${id}-body`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#7a5a26" />
+          <stop offset="0.18" stopColor="#c9a46e" />
+          <stop offset="0.38" stopColor="#f0dcb6" />
+          <stop offset="0.55" stopColor="#d4af7c" />
+          <stop offset="0.82" stopColor="#9c7638" />
+          <stop offset="1" stopColor="#5e451c" />
+        </linearGradient>
+        <linearGradient id={`${id}-top`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff4dc" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#fff4dc" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id={`${id}-shadow`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#000" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#000" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="100" cy="292" rx="92" ry="13" fill={`url(#${id}-shadow)`} />
+      <g fill={`url(#${id}-body)`}>
+        {/* crown: three merlons on a band */}
+        <path d="M42 36h30v28h13V36h30v28h13V36h30v62H42z" />
+        {/* chamfer */}
+        <path d="M46 103h108l-13 15H59z" />
+        {/* tower */}
+        <path d="M61 123h78l9 104H52z" />
+        {/* collar */}
+        <path d="M44 232h112v15H44z" />
+        {/* plinth */}
+        <path d="M30 252h140a8 8 0 0 1 8 8v24H22v-24a8 8 0 0 1 8-8z" />
+      </g>
+      {/* arrow slit */}
+      <rect x="95" y="145" width="10" height="40" rx="2" fill="#3d2c10" opacity="0.85" />
+      {/* light from above on each top face */}
+      <g fill={`url(#${id}-top)`}>
+        <path d="M42 36h30v10H42zM85 36h30v10H85zM128 36h30v10h-30zM46 103h108l-3 4H49zM44 232h112v5H44zM30 252h140v6H30z" />
+      </g>
+      {/* rim highlight */}
+      <g fill="none" stroke="#f6e7c8" strokeOpacity="0.5" strokeWidth="1">
+        <path d="M42 36h30M85 36h30M128 36h30M44 232h112M30 252h140" />
+      </g>
+    </svg>
+  );
+}

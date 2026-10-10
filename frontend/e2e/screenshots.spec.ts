@@ -78,5 +78,9 @@ test("capture P0 screens", async ({ page }) => {
   await shot(page, "15-home-mobile", false);
   await page.goto("/login");
   await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
-  await shot(page, "16-login-mobile", false);
+  await shot(page, "17-login-mobile");
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
+  await shot(page, "16-login-tablet", false);
 });

@@ -31,7 +31,7 @@ export function RookPageHeader({
   const pad = size === "hero" ? "px-6 py-8 md:px-10 md:py-10" : "px-6 py-7 md:px-9 md:py-8";
   return (
     <header className={`${ROOK_SURFACE.dark} relative mb-8 overflow-hidden rounded-[var(--radius-lg)] ${pad}`}>
-      <RookChessPattern tone="dark" fade="right" />
+      <RookChessPattern variant="dark" fade="right" opacity={0.8} />
       <span aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-gold/70 via-gold/20 to-transparent" />
       <div className="relative flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         <div className="min-w-0 max-w-3xl">

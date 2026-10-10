@@ -1,7 +1,7 @@
 /** ROOK design system — import every visual primitive from here. Domain components compose these. */
 export { RookAskBar, ASK_PLACEHOLDER } from "./askbar";
 export { RookStatusBadge, type RookStatusTone, type RookTrustTone } from "./badge";
-export { RookLogo, RookMark, RookTagline } from "./brand";
+export { RookHeroPiece, RookLogo, RookMark, RookTagline } from "./brand";
 export { ROOK_BUTTON, RookButton, RookButtonLink, type RookButtonVariant } from "./button";
 export { RookEvidence, RookSourceIcon, RookSourceLine, sourceType, type SourceLike } from "./evidence";
 export { MODULE_ICON, RookIcon, type IconName, type ModuleName } from "./icons";

@@ -8,7 +8,7 @@ import { RookChessPattern } from "./pattern";
 export function RookLoadingState({ stage, children }: { stage: string; children?: ReactNode }) {
   return (
     <div role="status" aria-live="polite" className="relative flex items-center gap-3.5 overflow-hidden rounded-[var(--radius-md)] border border-line bg-surface px-5 py-6 text-sm text-muted">
-      <RookChessPattern tone="light" fade="left" />
+      <RookChessPattern variant="light" fade="left" opacity={0.6} />
       <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] bg-midnight">
         <RookMark tone="gold" size={20} className="animate-pulse" />
       </span>
@@ -23,7 +23,7 @@ export function RookLoadingState({ stage, children }: { stage: string; children?
 export function RookEmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="relative flex items-start gap-3.5 overflow-hidden rounded-[var(--radius-md)] border border-dashed border-line-strong bg-board px-5 py-5 text-sm">
-      <RookChessPattern tone="light" fade="left" />
+      <RookChessPattern variant="light" fade="left" opacity={0.6} />
       <RookMark tone="midnight" size={22} className="relative mt-0.5" />
       <div className="relative">
         <p className="font-semibold text-midnight">{title}</p>

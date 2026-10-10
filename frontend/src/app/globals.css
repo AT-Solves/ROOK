@@ -29,6 +29,8 @@
   --rook-midnight-raised: #131c2e; /* a step lighter than Midnight: dark cards */
   --rook-slate-line: #24324a;      /* hairlines on Midnight */
   --rook-on-dark: #f8f7f4;         /* primary text on Midnight (Board Light) */
+  --rook-ivory: #f3eee4;           /* warm ivory: brand wordmark and hero copy on Midnight */
+  --rook-ivory-soft: #ece6da;
   --rook-on-dark-soft: #cbd5e1;    /* secondary text on Midnight: 11.8:1 */
   --rook-on-dark-muted: #94a3b8;   /* metadata on Midnight: 7.0:1 */
 
@@ -57,9 +59,12 @@
   --info-ink: #1e3a5f;     --info-mark: #4a6fa5;
 
   /* ---- chessboard texture */
-  --chess-light-square: rgb(71 85 105 / 0.055);  /* warm-gray square on Board Light */
-  --chess-dark-square: rgb(30 41 59 / 0.85);      /* Slate square on Midnight */
-  --chess-size: 44px;
+  --chess-dark-a: #0b1220;   /* Midnight */
+  --chess-dark-b: #1e293b;   /* Slate */
+  --chess-light-a: #f8f7f4;  /* Board Light */
+  --chess-light-b: #e7e2d8;  /* warm board square */
+  --chess-size: 44px;        /* texture scale (headers, sidebar, states) */
+  --chess-hero-size: 64px;   /* hero scale (login): recognisable as a board */
 
   /* ---- typography scale */
   --text-eyebrow: 11px;
@@ -116,6 +121,8 @@
   --color-warning: var(--rook-warning);
   --color-risk: var(--rook-risk);
   --color-on-dark: var(--rook-on-dark);
+  --color-ivory: var(--rook-ivory);
+  --color-ivory-soft: var(--rook-ivory-soft);
   --color-on-dark-soft: var(--rook-on-dark-soft);
   --color-on-dark-muted: var(--rook-on-dark-muted);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -174,13 +181,11 @@ body {
 }
 
 /* ---------------------------------------------------------------- chessboard texture (brand, not a game) */
-.rook-chess-light {
-  background-image: conic-gradient(var(--chess-light-square) 25%, transparent 0 50%, var(--chess-light-square) 0 75%, transparent 0);
-  background-size: var(--chess-size) var(--chess-size);
-}
-.rook-chess-dark {
-  background-image: conic-gradient(var(--chess-dark-square) 25%, transparent 0 50%, var(--chess-dark-square) 0 75%, transparent 0);
-  background-size: var(--chess-size) var(--chess-size);
+/* A true two-colour board: square A as the base, square B on alternate squares (crisp, no blur). */
+.rook-chess {
+  background-color: var(--chess-a);
+  background-image: conic-gradient(var(--chess-b) 25%, transparent 0 50%, var(--chess-b) 0 75%, transparent 0);
+  background-size: var(--chess-square2) var(--chess-square2);
 }
 .rook-fade-right {
   mask-image: linear-gradient(90deg, transparent 0%, rgb(0 0 0 / 0.35) 40%, #000 100%);
@@ -251,6 +256,12 @@ details[open] > summary .rook-disclosure {
 }
 .rook-disclosure {
   transition: transform var(--duration) var(--ease);
+}
+
+@media (max-width: 640px) {
+  :root {
+    --chess-hero-size: 40px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
