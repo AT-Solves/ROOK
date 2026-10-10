@@ -41,6 +41,8 @@ class Microsoft365Connector(BaseConnector):
     can_send = True
     required_env = ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT_ID")
     scopes = DATA_SCOPES
+    data_types = (("conversations", "Outlook mail"), ("meetings", "Calendar"),
+                  ("transcripts", "Teams meeting transcripts (where permitted)"))
     transport_override: httpx.BaseTransport | None = None  # tests inject a mock Graph here
 
     def __init__(self, config=None, context=None, transport: httpx.BaseTransport | None = None):

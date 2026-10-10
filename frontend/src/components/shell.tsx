@@ -20,7 +20,7 @@ export const NAV = [
   { href: "/decisions", label: "Decisions", module: "decisions" },
   { href: "/commitments", label: "Commitments", module: "commitments" },
   { href: "/risks", label: "Risks", module: "risks" },
-  { href: "/sources", label: "Sources", module: "sources" },
+  { href: "/context", label: "Context", module: "sources" },
 ] as const satisfies readonly { href: string; label: string; module: ModuleName }[];
 
 const subscribeNever = () => () => undefined;

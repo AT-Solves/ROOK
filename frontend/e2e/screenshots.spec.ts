@@ -66,9 +66,9 @@ test("capture P0 screens", async ({ page }) => {
   await expect(page.getByText("Why ROOK detected it")).toBeVisible();
   await shot(page, "10-risk-detail");
 
-  await page.goto("/sources");
-  await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
-  await shot(page, "11-sources");
+  await page.goto("/context");
+  await expect(page.getByRole("heading", { level: 1, name: "Context" })).toBeVisible();
+  await shot(page, "11-context");
 
   await page.goto("/evidence/1");
   await expect(page.getByText("Source type", { exact: true })).toBeVisible();

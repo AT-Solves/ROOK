@@ -15,6 +15,9 @@ class DemoConnector(BaseConnector):
     category = "communication"
     phase = 0
     can_send = True
+    synthetic = True
+    data_types = (("meetings", "Calendar"), ("conversations", "Email"), ("conversations", "Chat"),
+                  ("transcripts", "Meeting transcripts"), ("work_items", "Work items"))
 
     def sync(self, since: datetime | None) -> SyncBatch:
         # Meeting times are planned in the demo user's configured time zone (set at bootstrap).
@@ -32,6 +35,7 @@ class ManualConnector(BaseConnector):
     display_name = "Manual upload"
     category = "meetings"
     phase = 0
+    data_types = (("transcripts", "Uploaded transcripts and notes"),)
 
     def sync(self, since: datetime | None) -> SyncBatch:
         return SyncBatch()

@@ -109,7 +109,7 @@ def auth_callback(provider_id: str, code: str | None = None, state: str | None =
     except IdentityError as exc:
         return RedirectResponse(f"{web_url()}/login?error={quote(str(exc))}", status_code=302)
     if result.purpose == "connect":
-        return RedirectResponse(f"{web_url()}/sources?connected={result.connector.kind}&id={result.connector.id}",
+        return RedirectResponse(f"{web_url()}/context?connected={result.connector.kind}&id={result.connector.id}",
                                 status_code=302)
     token = issue_token(result.user)
     return RedirectResponse(f"{web_url()}/auth/complete#token={token}&return_to={quote(result.return_to)}", status_code=302)
@@ -449,6 +449,14 @@ def sources(user: User = Depends(current_user), db: Session = Depends(get_db)):
     return sorted(catalog, key=lambda x: (x["phase"], x["name"]))
 
 
+@router.get("/context")
+def context(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Context Control Center: sources, granted permissions, sync state, visible coverage and context health."""
+    from ..services.context import context_overview
+
+    return context_overview(db, user)
+
+
 class ConnectIn(BaseModel):
     kind: str
 
@@ -480,7 +488,7 @@ def connect_delegated(kind: str, user: User = Depends(current_user), db: Session
     if provider_id is None:
         raise HTTPException(404, "This source is not connected through OAuth")
     try:
-        return {"authorization_url": identity.start(db, provider_id, "connect", user=user, return_to="/sources")}
+        return {"authorization_url": identity.start(db, provider_id, "connect", user=user, return_to="/context")}
     except IdentityError as exc:
         raise HTTPException(503, str(exc)) from exc
 

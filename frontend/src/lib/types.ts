@@ -255,6 +255,58 @@ export interface SourceCatalogItem {
   connection: { id: number; status: string; last_synced_at: string | null } | null;
 }
 
+/* ---------------------------------------------------------------- Context Control Center (GET /api/context) */
+
+export type ContextType = "meetings" | "conversations" | "transcripts" | "work_items" | "documents";
+export interface Permission {
+  scope: string;
+  label: string;
+}
+export interface LastSync {
+  at: string;
+  ok: boolean;
+  error: string;
+  warnings: string[];
+  counts: { signals_new?: number; meetings?: number };
+}
+export interface ContextSource {
+  kind: string;
+  name: string;
+  category: string;
+  implemented: boolean;
+  synthetic: boolean;
+  delegated: boolean;
+  connectable: boolean;
+  setup_required: boolean;
+  data_types: { type: ContextType; label: string }[];
+  requested_permissions: Permission[];
+  sending: string;
+  state: "connected" | "available" | "later";
+  connection: {
+    id: number;
+    status: "connected" | "needs_reauth" | "needs_configuration" | "disconnected" | string;
+    account: string;
+    last_successful_sync: string | null;
+    last_sync: LastSync | null;
+    granted_permissions: Permission[];
+    visible_items: Record<ContextType, number>;
+  } | null;
+}
+export interface ContextHealth {
+  state: "strong" | "partial" | "limited" | "not_connected";
+  label: string;
+  claim_type: ClaimType;
+  summary: string;
+  reasons: { text: string; claim_type: ClaimType }[];
+  coverage: Record<ContextType, number>;
+  synthetic: boolean;
+}
+export interface ContextOverview {
+  health: ContextHealth;
+  sources: ContextSource[];
+  context_types: Record<ContextType, string>;
+}
+
 export interface SyncReport {
   signals_new: number;
   meetings_upserted: number;

@@ -32,7 +32,7 @@ test("all P0 workspace screens", async ({ page }) => {
   await expect(page.getByRole("article")).toBeVisible();
   await audit(page, "ask");
 
-  for (const [path, heading] of [["/meetings", "Meetings"], ["/decisions", "Decisions"], ["/commitments", "Commitments"], ["/risks", "Risks"], ["/sources", "Sources"]] as const) {
+  for (const [path, heading] of [["/meetings", "Meetings"], ["/decisions", "Decisions"], ["/commitments", "Commitments"], ["/risks", "Risks"], ["/context", "Context"]] as const) {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
     await page.waitForLoadState("networkidle");

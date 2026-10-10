@@ -103,6 +103,11 @@ class BaseConnector(ABC):
     scopes: tuple[str, ...] = ()
     can_send: bool = False
     delegated: bool = False  # True: one connection per user, synced with that user's own access
+    implemented: bool = True  # False for registered-but-not-built connectors: never offered as connectable
+    synthetic: bool = False  # True for the demo workspace: its data is labelled synthetic everywhere
+    # What this source contributes to ROOK's context: (context type, label shown to users).
+    # Context types: meetings | conversations | transcripts | work_items | documents
+    data_types: tuple[tuple[str, str], ...] = ()
 
     def __init__(self, config: dict | None = None, context: ConnectorContext | None = None):
         self.config = config or {}
