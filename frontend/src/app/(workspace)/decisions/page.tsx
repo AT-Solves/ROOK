@@ -1,9 +1,9 @@
 "use client";
 
 import { DecisionCard } from "@/components/cards";
+import { RookPageHeader } from "@/components/rook";
 import { Empty, StateGate } from "@/components/states";
 import { Tabs, useTab } from "@/components/tabs";
-import { PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 
@@ -19,7 +19,12 @@ export default function DecisionsPage() {
   const [tab, setTab] = useTab(IDS, "pending");
   return (
     <>
-      <PageHeader module="decisions" title="Decisions" subtitle="The decision register: what was decided, by whom, why, and where it was stated." />
+      <RookPageHeader
+        eyebrow="Decision register"
+        title="Decisions"
+        tagline="Know what was decided—and why."
+        meta={<span className="text-on-dark-muted">What was decided, by whom, why, and where it was stated.</span>}
+      />
       <StateGate
         state={state}
         what="the decision register"

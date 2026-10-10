@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 
+import { RookButton, RookPageHeader, RookSection, RookSourceIcon, type IconName } from "@/components/rook";
 import { Empty, StateGate } from "@/components/states";
-import { FeatureTile, type IconName } from "@/components/icons";
-import { Button, PageHeader, Section } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useSearchParam } from "@/lib/location";
@@ -22,20 +21,30 @@ export default function SourcesPage() {
     : null;
   return (
     <>
-      <PageHeader module="sources" title="Sources" subtitle="ROOK reads only what you can access in each system, and keeps each item's original permissions." />
-      {notice ? <p role="status" className="mb-6 rounded-[var(--radius-md)] border border-line border-l-[3px] border-l-success bg-surface p-3 text-sm shadow-[var(--shadow-card)]">{notice}</p> : null}
+      <RookPageHeader
+        eyebrow="Provenance"
+        title="Sources"
+        tagline="Trace every important insight."
+        meta={<span className="text-on-dark-muted">ROOK reads only what you can access in each system, and keeps each item&apos;s original permissions.</span>}
+      />
+      {notice ? <p role="status" className="mb-6 rounded-[var(--radius-md)] border border-line border-l-2 border-l-success bg-surface p-3.5 text-sm text-midnight shadow-[var(--shadow-card)]">{notice}</p> : null}
       <StateGate state={state} what="your sources" stage="Connecting">
         {(items) => {
           const available = items.filter((s) => s.phase <= 1 && s.kind !== "manual");
           const planned = items.filter((s) => s.phase > 1);
           return (
             <>
-              <Section title="Available" id="s-available" count={available.length} icon="database">
+              <RookSection title="Available" id="s-available" count={available.length} icon="database">
                 <ul className="space-y-3">{available.map((s) => <SourceRow key={s.kind} s={s} onChange={state.reload} />)}</ul>
-              </Section>
-              <Section title="Planned" id="s-planned" count={planned.length} icon="clock">
-                <p className="text-sm text-muted">{planned.map((p) => p.name).join(", ")} — not available in this version.</p>
-              </Section>
+              </RookSection>
+              <RookSection title="Planned" id="s-planned" count={planned.length} icon="clock">
+                <ul className="flex flex-wrap gap-2">
+                  {planned.map((p) => (
+                    <li key={p.kind} className="rounded-[var(--radius-sm)] bg-sunken px-3 py-1.5 text-[13px] text-ink-soft">{p.name}</li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[12px] text-muted">Not available in this version.</p>
+              </RookSection>
             </>
           );
         }}
@@ -79,13 +88,13 @@ function SourceRow({ s, onChange }: { s: SourceCatalogItem; onChange: () => void
 
   const status = conn ? { connected: "Connected", needs_reauth: "Needs reconnecting", needs_configuration: "Needs configuration", disconnected: "Disconnected" }[conn.status] ?? conn.status : "Not connected";
   return (
-    <li className="lift rounded-[var(--radius-md)] border border-line bg-surface p-4 shadow-[var(--shadow-card)]">
+    <li className="rook-interactive rounded-[var(--radius-md)] border border-line bg-surface p-5 shadow-[var(--shadow-card)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <FeatureTile name={SOURCE_ICON[s.kind] ?? "database"} size={40} />
+          <RookSourceIcon icon={SOURCE_ICON[s.kind] ?? "database"} size={40} />
           <div>
           <p className="font-semibold text-midnight">{s.name}</p>
-          <p className="text-xs text-muted">
+          <p className="text-[12px] text-muted">
             {status}
             {conn?.last_synced_at ? ` · last synced ${formatDateTime(conn.last_synced_at)}` : ""}
             {s.delegated ? " · connected per user, with your own access" : ""}
@@ -95,13 +104,13 @@ function SourceRow({ s, onChange }: { s: SourceCatalogItem; onChange: () => void
         <div className="flex gap-2">
           {s.delegated && (!conn || conn.status !== "connected") ? (
             s.credentials_present ? (
-              <Button variant="primary" icon="related" onClick={connect} disabled={!!stage}>{stage === "Connecting" ? "Connecting…" : conn ? "Reconnect" : "Connect"}</Button>
+              <RookButton variant="primary" icon="related" onClick={connect} disabled={!!stage}>{stage === "Connecting" ? "Connecting…" : conn ? "Reconnect" : "Connect"}</RookButton>
             ) : (
-              <span className="text-xs text-muted">Not configured on this server (administrator setup required)</span>
+              <span className="text-[12px] text-muted">Not configured on this server (administrator setup required)</span>
             )
           ) : null}
           {conn && conn.status === "connected" ? (
-            <Button variant="action" icon="refresh" onClick={sync} disabled={!!stage}>{stage === "Syncing" ? "Syncing…" : "Sync now"}</Button>
+            <RookButton variant="secondary" icon="refresh" onClick={sync} disabled={!!stage}>{stage === "Syncing" ? "Syncing…" : "Sync now"}</RookButton>
           ) : null}
         </div>
       </div>

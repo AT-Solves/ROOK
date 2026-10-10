@@ -35,7 +35,7 @@ Any frontend work, UI copy, or API shape decision driven by a screen.
 - **States**: every screen has a meaningful empty state, progressive loading states (Connecting
   → Syncing → Analyzing → Preparing → Ready), and errors that say what failed, what the user can
   do, and whether partial results are shown (UX §12–14).
-- **Visual**: the ROOK chess-inspired design system (`docs/design/DESIGN_SYSTEM.md`, ADR-0008) —
+- **Visual**: the ROOK design system v2 (`docs/design/DESIGN_SYSTEM.md`, ADR-0008; primitives in `frontend/src/components/rook/`, imported from `@/components/rook`) —
   Midnight/Rook Gold palette, geometric rook logo, one icon family, board-texture motifs. Use its tokens and
   shared components; never style page by page or introduce other palettes, icon sets or logos. Gold is an
   accent, never body text on light surfaces. Desktop first, and responsive for tablet and phone briefing (UX §16, §18).

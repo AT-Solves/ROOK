@@ -3,9 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
-import { Logo, RookMark } from "@/components/brand";
-import { Icon } from "@/components/icons";
-import { BUTTON, Button } from "@/components/ui";
+import { ROOK_BUTTON, RookButton, RookChessPattern, RookIcon, RookLogo, RookMark } from "@/components/rook";
 import { API_BASE, ApiError, api } from "@/lib/api";
 import { useSearchParam } from "@/lib/location";
 import { safeReturnTo, setToken } from "@/lib/session";
@@ -44,67 +42,78 @@ export default function LoginPage() {
 
   const ms = providers?.providers.find((p) => p.id === "microsoft");
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[1.1fr_1fr]">
-      {/* Identity panel: the ROOK brand on the midnight board. Decorative; the form carries all functionality. */}
-      <aside className="surface-dark board-hero relative flex flex-col justify-between overflow-hidden px-8 py-10 text-white lg:min-h-screen lg:px-14 lg:py-14">
-        <RookMark tone="outline" size={440} className="pointer-events-none absolute -bottom-16 -right-20 opacity-60" />
-        <span className="relative lg:hidden"><Logo surface="dark" size="lg" subtitle tagline /></span>
-        <span className="relative hidden lg:block"><Logo surface="dark" size="xl" subtitle tagline /></span>
-        <p className="relative mt-10 hidden max-w-md text-[15px] leading-relaxed text-slate-300 lg:block">
-          ROOK connects your meetings, messages and work into one evidence-backed view of what was decided, who owns
-          what, and what needs your judgment next.
-        </p>
-      </aside>
+    <div className="rook-dark relative min-h-screen overflow-hidden bg-midnight text-on-dark-soft">
+      {/* The board: chess geometry fading out from the right; decorative only. */}
+      <RookChessPattern tone="dark" fade="radial" />
+      <span aria-hidden className="pointer-events-none absolute -right-40 top-1/2 h-[46rem] w-[46rem] -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgb(212_175_124/0.10)_0%,transparent_60%)]" />
+      <main id="main" className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center gap-12 px-6 py-14 lg:flex-row lg:justify-between lg:gap-16 lg:px-10">
+        <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+          <span className="lg:hidden"><RookLogo tone="dark" size="lg" subtitle tagline stacked /></span>
+          <span className="hidden lg:block"><RookLogo tone="dark" size="xl" subtitle tagline /></span>
+          <p className="mt-10 hidden max-w-md text-[15px] leading-relaxed text-on-dark-soft lg:block">
+            ROOK connects your meetings, messages and work into one evidence-backed view of what was decided, who owns
+            what, and what needs your judgment next.
+          </p>
+        </div>
 
-      <main id="main" className="board-light flex items-center px-6 py-12 lg:px-14">
-        <div className="mx-auto w-full max-w-md">
-          <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold text-midnight">Sign in to ROOK</h1>
-          <p className="mt-1 text-sm text-muted">Your AI Chief of Staff — every insight traced to its source.</p>
+        <div className="w-full max-w-md">
+          <div className="rounded-[var(--radius-lg)] border border-slate-line bg-midnight-raised/90 p-7 shadow-[var(--shadow-raised)] backdrop-blur-sm">
+            <h1 className="rook-display text-[2rem] text-on-dark">Sign in to ROOK</h1>
+            <p className="mt-1.5 text-[14px] text-on-dark-soft">Every insight traced to its source.</p>
+            <span aria-hidden className="rook-gold-rule mt-5" />
 
-          {authError ? (
-            <p role="alert" className="mt-6 rounded-[var(--radius-md)] border border-line border-l-[3px] border-l-risk bg-surface p-3 text-sm">
-              Sign-in didn&apos;t complete: {authError}
-            </p>
-          ) : null}
-          {loadError ? (
-            <p role="alert" className="mt-6 rounded-[var(--radius-md)] border border-line border-l-[3px] border-l-risk bg-surface p-3 text-sm">
-              {loadError} No action is needed from you if this is temporary — try again shortly.
-            </p>
-          ) : null}
-          {!providers && !loadError ? <p role="status" className="mt-6 text-sm text-muted">Connecting…</p> : null}
+            {authError ? (
+              <p role="alert" className="mt-5 border-l-2 border-risk bg-white/[0.04] px-3 py-2.5 text-sm text-on-dark">
+                Sign-in didn&apos;t complete: {authError}
+              </p>
+            ) : null}
+            {loadError ? (
+              <p role="alert" className="mt-5 border-l-2 border-risk bg-white/[0.04] px-3 py-2.5 text-sm text-on-dark">
+                {loadError} No action is needed from you if this is temporary — try again shortly.
+              </p>
+            ) : null}
+            {!providers && !loadError ? <p role="status" className="mt-5 text-sm text-on-dark-muted">Connecting…</p> : null}
 
-          {providers ? (
-            <div className="mt-8 space-y-5">
-              <section aria-labelledby="sso" className="rounded-[var(--radius-md)] border border-line bg-surface p-5 shadow-[var(--shadow-card)]">
-                <h2 id="sso" className="flex items-center gap-2 text-sm font-semibold text-midnight">
-                  <Icon name="lock" size={16} accent />
-                  Sign in with your organisation
-                </h2>
-                {ms?.configured ? (
-                  <a className={`${BUTTON.primary} mt-4 w-full`} href={`${API_BASE}${ms.login_url}?return_to=${encodeURIComponent(returnTo)}`}>
-                    <RookMark tone="gold" size={18} />
-                    <span>Sign in with Microsoft</span>
-                  </a>
-                ) : (
-                  <p className="mt-2 text-sm text-muted">
-                    Microsoft sign-in isn&apos;t configured on this server yet. An administrator needs to complete the steps in
-                    docs/integrations/microsoft365.md.
-                  </p>
-                )}
-              </section>
-              {providers.dev_login ? (
-                <section aria-labelledby="demo" className="rounded-[var(--radius-md)] border border-dashed border-line-strong bg-surface/70 p-5">
-                  <h2 id="demo" className="text-sm font-semibold text-midnight">Demo workspace</h2>
-                  <p className="mt-1 text-xs text-muted">Synthetic data only. Disabled in shared environments.</p>
-                  <form onSubmit={devLogin} className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <label htmlFor={emailId} className="sr-only">Demo user email</label>
-                    <input id={emailId} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="min-w-0 flex-1 rounded-[10px] border border-line-strong bg-white px-3 py-2 text-sm" />
-                    <Button type="submit" variant="action" icon="arrowRight" disabled={busy}>{busy ? "Signing in…" : "Enter demo"}</Button>
-                  </form>
+            {providers ? (
+              <div className="mt-6 space-y-6">
+                <section aria-labelledby="sso">
+                  <h2 id="sso" className="flex items-center gap-2 text-[13px] font-semibold text-on-dark">
+                    <RookIcon name="lock" size={15} className="text-gold" />
+                    Sign in with your organisation
+                  </h2>
+                  {ms?.configured ? (
+                    <a className={`${ROOK_BUTTON.strategic} mt-3.5 w-full py-2.5 text-[14px]`} href={`${API_BASE}${ms.login_url}?return_to=${encodeURIComponent(returnTo)}`}>
+                      <RookMark tone="midnight" size={18} />
+                      <span>Sign in with Microsoft</span>
+                    </a>
+                  ) : (
+                    <p className="mt-2 text-[13px] leading-relaxed text-on-dark-muted">
+                      Microsoft sign-in isn&apos;t configured on this server yet. An administrator needs to complete the steps in
+                      docs/integrations/microsoft365.md.
+                    </p>
+                  )}
                 </section>
-              ) : null}
-            </div>
-          ) : null}
+                {providers.dev_login ? (
+                  <section aria-labelledby="demo" className="border-t border-slate-line pt-5">
+                    <h2 id="demo" className="text-[13px] font-semibold text-on-dark">Demo workspace</h2>
+                    <p className="mt-1 text-[12px] text-on-dark-muted">Synthetic data only. Disabled in shared environments.</p>
+                    <form onSubmit={devLogin} className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <label htmlFor={emailId} className="sr-only">Demo user email</label>
+                      <input
+                        id={emailId}
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-slate-line bg-midnight px-3 py-2 text-sm text-on-dark placeholder:text-on-dark-muted focus:border-gold"
+                      />
+                      <RookButton type="submit" variant="onDark" icon="arrowRight" disabled={busy}>{busy ? "Signing in…" : "Enter demo"}</RookButton>
+                    </form>
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
       </main>
     </div>

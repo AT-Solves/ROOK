@@ -3,8 +3,8 @@
 import { useState } from "react";
 
 import { AnswerView, AskForm } from "@/components/ask";
+import { RookPageHeader } from "@/components/rook";
 import { Empty } from "@/components/states";
-import { PageHeader } from "@/components/ui";
 import type { AskAnswer } from "@/lib/types";
 
 /** Ask ROOK (UX §5): chat-like input, structured answers. Answers stay in this tab only. */
@@ -12,13 +12,14 @@ export default function AskPage() {
   const [answers, setAnswers] = useState<AskAnswer[]>([]);
   return (
     <>
-      <PageHeader
-        module="ask"
+      <RookPageHeader
+        eyebrow="Organizational context"
         title="Ask ROOK"
-        subtitle="Answers come only from sources you can access. Every claim is labelled Fact, Inference, Recommendation or Unknown."
+        tagline="Ask across your organizational context."
+        meta={<span className="text-on-dark-muted">Answers come only from sources you can access. Every claim is labelled Fact, Inference, Recommendation or Unknown.</span>}
       />
       <AskForm onAnswer={(a) => setAnswers((prev) => [a, ...prev])} />
-      <div aria-live="polite" className="mt-6 space-y-4">
+      <div aria-live="polite" className="mt-8 space-y-5">
         {answers.length ? (
           answers.map((a, i) => <AnswerView key={answers.length - i} a={a} />)
         ) : (

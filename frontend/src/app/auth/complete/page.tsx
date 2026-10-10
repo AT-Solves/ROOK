@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { RookMark } from "@/components/rook";
 import { safeReturnTo, setToken } from "@/lib/session";
 
 /** Landing page after Microsoft sign-in. The session token arrives in the URL fragment (never sent to servers). */
@@ -20,8 +21,11 @@ export default function AuthComplete() {
     router.replace(safeReturnTo(frag.get("return_to")));
   }, [router]);
   return (
-    <main id="main" className="mx-auto mt-16 max-w-md px-4 text-sm">
-      <p role="status">Connecting…</p>
+    <main id="main" className="rook-dark flex min-h-screen items-center justify-center bg-midnight px-4 text-sm text-on-dark-soft">
+      <p role="status" className="flex items-center gap-3">
+        <RookMark tone="gold" size={28} className="animate-pulse" />
+        Connecting…
+      </p>
     </main>
   );
 }

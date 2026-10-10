@@ -1,9 +1,9 @@
 "use client";
 
 import { CommitmentCard } from "@/components/cards";
+import { RookPageHeader } from "@/components/rook";
 import { Empty, StateGate } from "@/components/states";
 import { Tabs, useTab } from "@/components/tabs";
-import { PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Commitment } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
@@ -36,7 +36,12 @@ export default function CommitmentsPage() {
   const [tab, setTab] = useTab(IDS, "waiting");
   return (
     <>
-      <PageHeader module="commitments" title="Commitments" subtitle="Who committed to what, by when, and the source where it was said." />
+      <RookPageHeader
+        eyebrow="Accountability"
+        title="Commitments"
+        tagline="Keep promises visible."
+        meta={<span className="text-on-dark-muted">Who committed to what, by when, and the source where it was said.</span>}
+      />
       <StateGate
         state={state}
         what="commitments"
@@ -50,7 +55,7 @@ export default function CommitmentsPage() {
             <>
               <Tabs tabs={TABS} value={tab} onChange={setTab} label="Filter commitments" counts={counts} />
               {tab === "proposed" && shown.length ? (
-                <p className="mb-3 text-sm text-muted">These are inferences, not commitments anyone made. Open one to assign an owner or dismiss it.</p>
+                <p className="mb-4 border-l-2 border-[var(--inf-mark)] pl-3 text-[13px] text-muted">These are inferences, not commitments anyone made. Open one to assign an owner or dismiss it.</p>
               ) : null}
               {shown.length ? <ul className="space-y-3">{shown.map((c) => <CommitmentCard key={c.id} c={c} showAction={tab === "waiting"} />)}</ul> : <Empty title={EMPTY[tab]} />}
             </>

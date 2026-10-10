@@ -72,7 +72,7 @@ test("executive workflow: attention → meeting → evidence → ask → recomme
 test("decision, commitment and risk details show provenance and related context", async ({ page }) => {
   await signIn(page);
   await page.goto("/decisions?tab=made");
-  await page.getByRole("link", { name: "Launch Project Phoenix on October 18" }).click();
+  await page.getByRole("link", { name: /^Launch Project Phoenix on / }).click(); // demo dates are relative to today
   for (const label of ["Status", "Date", "Decision owner", "Context", "Why", "Participants"]) await expect(page.getByText(label, { exact: true })).toBeVisible();
   await expect(page.getByRole("main")).toContainText("Customer contractual commitment with Northwind");
   await expect(page.getByRole("region", { name: /Related actions/ })).toContainText("performance testing");
