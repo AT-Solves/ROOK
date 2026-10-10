@@ -24,6 +24,7 @@ def test_demo_context_is_labelled_synthetic_and_explains_its_health(client):
     assert h["state"] in {"strong", "partial", "limited"}
     # every health state is explained by FACT reasons derived from real counts
     assert h["reasons"] and all(r["claim_type"] == "FACT" for r in h["reasons"])
+    assert {r["kind"] for r in h["reasons"]} <= {"access", "limitation"}
     assert h["coverage"]["meetings"] > 0 and h["coverage"]["conversations"] > 0
     assert any(r["text"].startswith("Meetings:") for r in h["reasons"])
 
@@ -35,6 +36,10 @@ def test_unbuilt_sources_are_never_offered_as_connectable(client):
     assert all(not s["implemented"] and not s["connectable"] and s["connection"] is None for s in later)
     slack = next(s for s in later if s["kind"] == "slack")
     assert [d["label"] for d in slack["data_types"]] == ["Messages", "Channels", "Threads"]
+    groups = {g["name"]: g for g in _ctx(client, login(client))["available_later"]}
+    assert groups["Atlassian"]["products"] == ["Confluence", "Jira"]
+    assert groups["Google Workspace"]["products"] == ["Gmail", "Google Calendar"]
+    assert {"Slack", "GitHub", "Zoom"} <= set(groups)
 
 
 def test_microsoft_365_needs_admin_setup_when_unconfigured(client, monkeypatch):
@@ -93,3 +98,72 @@ def test_no_sources_means_not_connected(db):
     user = User(org_id=999, email="nobody@example.com", name="Nobody")
     h = health(db, user, sources(db, user))
     assert h["state"] == "not_connected" and h["reasons"][0]["claim_type"] == "FACT"
+
+
+def test_access_is_shown_per_kind_of_data_with_the_reason(client, session_factory, m365):
+    m365.transcripts_forbidden = True
+    headers = entra_sign_in(client, session_factory, m365)
+    cid = connect_m365(client, session_factory, m365, headers)
+    before = next(s for s in _ctx(client, headers)["sources"] if s["kind"] == "microsoft365")["connection"]
+    assert {a["key"]: a["status"] for a in before["access"]}["mail"] == "granted"  # granted, not yet read
+    assert before["last_attempted_sync"] is None and before["actions"] == ["sync", "reconnect", "disconnect"]
+
+    client.post(f"/api/sources/{cid}/sync", headers=headers)
+    ms = next(s for s in _ctx(client, headers)["sources"] if s["kind"] == "microsoft365")
+    access = {a["key"]: a for a in ms["connection"]["access"]}
+    assert ms["name"] == "Microsoft 365"
+    assert access["mail"]["status"] == "available" and access["calendar"]["status"] == "available"
+    t = access["teams_transcripts"]
+    assert t["status"] == "admin_required" and t["status_label"] == "Administrator permission required"
+    assert "HTTP 403" in t["reason"] and t["ok"] is False
+    c = ms["connection"]
+    assert c["last_attempted_sync"] and c["last_sync"]["counts"]["signals_new"] >= 1
+    h = _ctx(client, headers)["health"]
+    assert h["state"] == "partial" and "but not Teams meeting transcripts" in h["summary"]
+    assert any("Administrator permission required" in r["text"] or "administrator permission required" in r["text"]
+               for r in h["reasons"])
+
+
+def test_transcripts_turned_off_on_the_server_are_explained(client, session_factory, m365, monkeypatch):
+    monkeypatch.setenv("MICROSOFT_ENABLE_TRANSCRIPTS", "false")
+    headers = entra_sign_in(client, session_factory, m365)
+    cid = connect_m365(client, session_factory, m365, headers)
+    client.post(f"/api/sources/{cid}/sync", headers=headers)
+    c = next(s for s in _ctx(client, headers)["sources"] if s["kind"] == "microsoft365")["connection"]
+    assert {a["key"]: a["status"] for a in c["access"]}["teams_transcripts"] == "disabled"
+
+
+def test_a_colleagues_microsoft_connection_is_never_shown(client, session_factory, m365):
+    headers = entra_sign_in(client, session_factory, m365)
+    connect_m365(client, session_factory, m365, headers)
+    with session_factory() as db:
+        org_id = db.scalar(select(User.org_id).where(User.email == "yamini@contoso.example"))
+        db.add(User(org_id=org_id, email="dana@contoso.example", name="Dana Ruiz", role="member"))
+        db.commit()
+    ms = next(s for s in _ctx(client, login(client, "dana@contoso.example"))["sources"] if s["kind"] == "microsoft365")
+    assert ms["state"] == "available" and ms["connection"] is None
+    assert "yamini@contoso.example" not in str(_ctx(client, login(client, "dana@contoso.example")))
+
+
+def test_disconnected_source_reads_as_disconnected_and_stops_counting(client, session_factory, m365):
+    headers = entra_sign_in(client, session_factory, m365)
+    cid = connect_m365(client, session_factory, m365, headers)
+    client.post(f"/api/sources/{cid}/sync", headers=headers)
+    assert client.post(f"/api/sources/{cid}/disconnect", headers=headers).status_code == 200
+    ms = next(s for s in _ctx(client, headers)["sources"] if s["kind"] == "microsoft365")
+    assert ms["state"] == "available" and ms["connection"]["status"] == "disconnected"
+    assert all(a["status"] == "disconnected" for a in ms["connection"]["access"])
+    assert "sync" not in ms["connection"]["actions"] and "disconnect" not in ms["connection"]["actions"]
+    assert _ctx(client, headers)["health"]["state"] == "not_connected"
+
+
+def test_members_cannot_disconnect_organization_sources(client, session_factory):
+    login(client)
+    with session_factory() as db:
+        org_id = db.scalar(select(User.org_id).where(User.email == "yamini@acme.example"))
+        demo = db.scalar(select(Connector.id).where(Connector.org_id == org_id, Connector.kind == "demo"))
+    member = login(client, "marcus@acme.example")
+    assert client.post(f"/api/sources/{demo}/disconnect", headers=member).status_code == 403
+    assert client.post(f"/api/sources/{demo}/disconnect", headers=login(client)).status_code == 403  # synthetic stays
+    d = next(s for s in _ctx(client, member)["sources"] if s["kind"] == "demo")["connection"]
+    assert d["actions"] == ["sync"] and all(a["ok"] for a in d["access"])

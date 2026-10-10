@@ -92,6 +92,24 @@ class ConnectorContext:
     get_access_token: Callable[[], str] | None = None
     lookback_days: int = 14
     warnings: list[str] = field(default_factory=list)
+    # Data a sync could not read, by DataType.key: {"status": "admin_required" | "disabled" | "unavailable", "reason"}
+    access_gaps: dict[str, dict] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class DataType:
+    """One kind of data a source provides.
+
+    ``context`` is the ROOK context type it feeds (meetings | conversations | transcripts | work_items | documents);
+    ``scopes`` are the delegated permissions needed to read it; ``admin_consent`` marks data a tenant administrator
+    must approve before any user can grant it.
+    """
+
+    key: str
+    context: str
+    label: str
+    scopes: tuple[str, ...] = ()
+    admin_consent: bool = False
 
 
 class BaseConnector(ABC):
@@ -105,9 +123,9 @@ class BaseConnector(ABC):
     delegated: bool = False  # True: one connection per user, synced with that user's own access
     implemented: bool = True  # False for registered-but-not-built connectors: never offered as connectable
     synthetic: bool = False  # True for the demo workspace: its data is labelled synthetic everywhere
-    # What this source contributes to ROOK's context: (context type, label shown to users).
-    # Context types: meetings | conversations | transcripts | work_items | documents
-    data_types: tuple[tuple[str, str], ...] = ()
+    suite: str = ""  # product family shown to users, e.g. "Google Workspace" for Gmail and Google Calendar
+    # What this source contributes to ROOK's context, and which delegated permissions each kind of data needs.
+    data_types: tuple[DataType, ...] = ()
 
     def __init__(self, config: dict | None = None, context: ConnectorContext | None = None):
         self.config = config or {}

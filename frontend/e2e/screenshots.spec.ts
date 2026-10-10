@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { withMicrosoft365 } from "./context-fixture";
 import { signIn } from "./helpers";
 
 /** Visual evidence for design review (docs/screenshots): every P0 screen, desktop + tablet + phone. Run with CAPTURE_SCREENSHOTS=1. */
@@ -69,6 +70,20 @@ test("capture P0 screens", async ({ page }) => {
   await page.goto("/context");
   await expect(page.getByRole("heading", { level: 1, name: "Context" })).toBeVisible();
   await shot(page, "11-context");
+  await shot(page, "11-context-1440x900", false);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await shot(page, "11-context-1280x800", false);
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await shot(page, "11-context-tablet");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await shot(page, "11-context-mobile");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // Microsoft 365 connected with a transcript permission gap (API response shape from backend/tests/test_context.py)
+  await withMicrosoft365(page);
+  await page.reload();
+  await expect(page.getByRole("article", { name: "Microsoft 365" })).toBeVisible();
+  await shot(page, "11-context-microsoft365-permission-gap");
+  await page.unroute("**/api/context");
 
   await page.goto("/evidence/1");
   await expect(page.getByText("Source type", { exact: true })).toBeVisible();

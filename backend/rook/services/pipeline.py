@@ -72,7 +72,8 @@ def sync_connector(db: Session, connector: Connector, actor: str = "system") -> 
         batch = instance.sync(connector.last_synced_at)
     except (ConnectorNotConfigured, ConnectorAuthError) as exc:
         connector.status = "needs_reauth" if isinstance(exc, ConnectorAuthError) else "needs_configuration"
-        _record_sync(connector, ok=False, error=str(exc), warnings=list(instance.context.warnings))
+        _record_sync(connector, ok=False, error=str(exc), warnings=list(instance.context.warnings),
+                     gaps=dict(instance.context.access_gaps))
         audit.record(db, org_id=connector.org_id, actor=actor, action="connector.sync_failed",
                      tool=connector.kind, result=str(exc))
         db.commit()
@@ -81,7 +82,7 @@ def sync_connector(db: Session, connector: Connector, actor: str = "system") -> 
     report.warnings = list(instance.context.warnings)
     connector.last_synced_at = utcnow()
     connector.status = "connected"
-    _record_sync(connector, ok=True, warnings=report.warnings,
+    _record_sync(connector, ok=True, warnings=report.warnings, gaps=dict(instance.context.access_gaps),
                  counts={"signals_new": report.signals_new, "meetings": report.meetings_upserted})
     audit.record(db, org_id=connector.org_id, actor=actor, action="connector.synced", tool=connector.kind,
                  intent="Synchronise permitted information from source", input={"connector_id": connector.id},
@@ -90,12 +91,14 @@ def sync_connector(db: Session, connector: Connector, actor: str = "system") -> 
     return report
 
 
-def _record_sync(connector: Connector, *, ok: bool, warnings: list[str], error: str = "", counts: dict | None = None) -> None:
+def _record_sync(connector: Connector, *, ok: bool, warnings: list[str], error: str = "", counts: dict | None = None,
+                 gaps: dict | None = None) -> None:
     """Keep the outcome of the latest sync on the connector, so users can see what happened (Context Control Center)."""
     from .views import iso
 
     connector.config = {**(connector.config or {}), "last_sync": {
-        "at": iso(utcnow()), "ok": ok, "error": error, "warnings": warnings[:20], "counts": counts or {}}}
+        "at": iso(utcnow()), "ok": ok, "error": error, "warnings": warnings[:20], "counts": counts or {},
+        "gaps": gaps or {}}}
 
 
 def ingest(db: Session, connector: Connector, batch: SyncBatch) -> SyncReport:

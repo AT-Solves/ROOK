@@ -514,6 +514,10 @@ def sync_source(cid: int, user: User = Depends(current_user), db: Session = Depe
 @router.post("/sources/{cid}/disconnect")
 def disconnect_source(cid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     conn = _my_connector(db, user, cid)
+    cls = get_connector_class(conn.kind)
+    if not cls.delegated and (user.role != "admin" or cls.synthetic or not cls.implemented):
+        # an organization-wide source is disconnected by an administrator; the synthetic workspace stays
+        raise HTTPException(403, "Only an administrator can disconnect an organization-wide source.")
     identity.disconnect(db, user, conn)
     return {"id": conn.id, "status": conn.status}
 

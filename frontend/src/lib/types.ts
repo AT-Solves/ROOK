@@ -269,16 +269,28 @@ export interface LastSync {
   warnings: string[];
   counts: { signals_new?: number; meetings?: number };
 }
+export type AccessStatus = "available" | "granted" | "not_granted" | "admin_required" | "disabled" | "unavailable" | "disconnected";
+export interface DataAccess {
+  key: string;
+  label: string;
+  context: ContextType;
+  status: AccessStatus;
+  status_label: string;
+  reason: string;
+  ok: boolean;
+}
+export type SourceAction = "sync" | "reconnect" | "disconnect";
 export interface ContextSource {
   kind: string;
   name: string;
+  suite: string;
   category: string;
   implemented: boolean;
   synthetic: boolean;
   delegated: boolean;
   connectable: boolean;
   setup_required: boolean;
-  data_types: { type: ContextType; label: string }[];
+  data_types: { key: string; type: ContextType; label: string }[];
   requested_permissions: Permission[];
   sending: string;
   state: "connected" | "available" | "later";
@@ -286,24 +298,35 @@ export interface ContextSource {
     id: number;
     status: "connected" | "needs_reauth" | "needs_configuration" | "disconnected" | string;
     account: string;
+    last_attempted_sync: string | null;
     last_successful_sync: string | null;
     last_sync: LastSync | null;
     granted_permissions: Permission[];
+    access: DataAccess[];
     visible_items: Record<ContextType, number>;
+    actions: SourceAction[];
   } | null;
+}
+export interface LaterGroup {
+  name: string;
+  products: string[];
+  data_types: string[];
 }
 export interface ContextHealth {
   state: "strong" | "partial" | "limited" | "not_connected";
   label: string;
   claim_type: ClaimType;
   summary: string;
-  reasons: { text: string; claim_type: ClaimType }[];
+  /** "access": what ROOK can use; "limitation": what is missing, out of date or not permitted. */
+  reasons: { text: string; claim_type: ClaimType; kind: "access" | "limitation" }[];
   coverage: Record<ContextType, number>;
   synthetic: boolean;
 }
 export interface ContextOverview {
+  tagline: string;
   health: ContextHealth;
   sources: ContextSource[];
+  available_later: LaterGroup[];
   context_types: Record<ContextType, string>;
 }
 
