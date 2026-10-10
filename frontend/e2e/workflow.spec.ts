@@ -10,22 +10,23 @@ test("executive workflow: attention → meeting → evidence → ask → recomme
   await signIn(page);
   const main = page.getByRole("main");
 
-  // 1. What needs attention — insight first, labelled as an inference, with evidence and a recommendation
-  const attention = page.getByRole("region", { name: /Needs your attention/ });
-  const phoenix = attention.getByRole("listitem").filter({ hasText: "Project Phoenix at risk: dependency delayed" });
+  // 1. What needs judgment — one situation, insight first, its claims labelled separately, evidence and a recommendation
+  const judgment = page.getByRole("region", { name: /One thing needs your judgment/ });
+  const phoenix = judgment.getByRole("article").filter({ hasText: "Project Phoenix at risk: dependency delayed" });
   await expect(phoenix.locator("[data-claim-type]").first()).toHaveAttribute("data-claim-type", "INFERENCE");
   await expect(phoenix.getByText(/Evidence · \d+ sources/)).toBeVisible();
-  await expect(phoenix.locator('[data-claim-type="RECOMMENDATION"]')).toBeVisible();
+  await expect(phoenix.locator('[data-claim-type="RECOMMENDATION"]').first()).toBeVisible();
 
-  // 2–5. Today's meetings, pending decisions, commitments, risks
-  await expect(page.getByRole("region", { name: /^Today/ }).getByRole("link", { name: "Phoenix Product Review" })).toBeVisible();
-  await expect(page.getByRole("region", { name: /Decisions pending/ })).toContainText("Approve the Phoenix enterprise pricing tiers");
-  await expect(page.getByRole("region", { name: /Your commitments/ })).toContainText("Northwind executive sponsor");
-  await expect(page.getByRole("region", { name: /Waiting on others/ })).toContainText("Send the updated financial forecast");
-  await expect(page.getByRole("region", { name: /At risk/ })).toContainText("Payments Migration");
+  // 2–5. Today's moves, next moves (decisions, own commitments, follow-ups), what ROOK is watching
+  await expect(page.getByRole("region", { name: /^Today's moves/ }).getByRole("link", { name: "Phoenix Product Review" })).toBeVisible();
+  const moves = page.getByRole("region", { name: /Your next moves/ });
+  await expect(moves).toContainText("Approve the Phoenix enterprise pricing tiers");
+  await expect(moves).toContainText("Northwind executive sponsor");
+  await expect(moves).toContainText("Follow up with Sarah");
+  await expect(page.getByRole("region", { name: /^Watch/ })).toContainText("Payments Migration");
 
   // 6. Open a meeting and understand its context
-  await page.getByRole("region", { name: /^Today/ }).getByRole("link", { name: "Phoenix Product Review" }).click();
+  await page.getByRole("region", { name: /^Today's moves/ }).getByRole("link", { name: "Phoenix Product Review" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Phoenix Product Review" })).toBeVisible();
   await expect(main).toContainText("Preparation suggested");
   for (const section of ["Purpose", "Participants", "Suggested questions", "Related risks", "Related decisions", "Open actions", "Previous context", "Sources"]) {

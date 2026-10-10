@@ -17,6 +17,7 @@ export function RookAskBar({
   busy = false,
   size = "standard",
   footer,
+  placeholder = ASK_PLACEHOLDER,
 }: {
   inputId: string;
   value: string;
@@ -25,6 +26,7 @@ export function RookAskBar({
   busy?: boolean;
   size?: "standard" | "hero";
   footer?: ReactNode;
+  placeholder?: string;
 }) {
   const hero = size === "hero";
   return (
@@ -47,7 +49,7 @@ export function RookAskBar({
             id={inputId}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={ASK_PLACEHOLDER}
+            placeholder={placeholder}
             maxLength={1000}
             autoComplete="off"
             className={`min-w-0 flex-1 bg-transparent py-2 text-midnight placeholder:text-chess focus:outline-none focus-visible:outline-none ${hero ? "text-[17px]" : "text-[15px]"}`}
