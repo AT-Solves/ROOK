@@ -5,8 +5,8 @@ import Link from "next/link";
 import { RiskCard } from "@/components/cards";
 import { EvidenceList } from "@/components/evidence";
 import { Empty, StateGate } from "@/components/states";
-import { ClaimBadge, ConfidenceLabel, StatusText } from "@/components/trust";
-import { Field, PageHeader, Section } from "@/components/ui";
+import { RookCard, RookField as Field, RookPageHeader, RookSection as Section } from "@/components/rook";
+import { StatusText, TrustRow } from "@/components/trust";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
@@ -18,30 +18,33 @@ export function DecisionDetail({ id }: { id: number }) {
     <StateGate state={state} what="this decision">
       {(d) => (
         <>
-          <PageHeader module="decisions" title={d.statement} subtitle={<span className="font-mono">{d.code}</span>} />
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <ClaimBadge type={d.claim_type} />
-            <ConfidenceLabel value={d.confidence} />
-            <span className="text-xs text-muted">{d.basis}</span>
-          </div>
-          <dl className="mb-10 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-1 shadow-[var(--shadow-card)]">
-            <Field label="Status"><StatusText status={d.status} />{d.needs_me ? <span className="ml-2 text-xs">· waiting for you</span> : null}</Field>
+          <RookPageHeader
+            size="detail"
+            eyebrow={`Decision · ${d.code}`}
+            title={d.statement}
+            meta={<TrustRow type={d.claim_type} confidence={d.confidence} basis={d.basis}><StatusText status={d.status} onDark /></TrustRow>}
+          />
+          <RookCard as="dl" level={1} flush className="mb-10 px-5 py-1 md:px-6">
+            <Field label="Status"><StatusText status={d.status} />{d.needs_me ? <span className="ml-2 text-[12px] text-muted">· waiting for you</span> : null}</Field>
             <Field label="Date">{formatDateTime(d.decided_at)}</Field>
             <Field label={d.status === "pending" ? "Decision needed from" : "Decision owner"}>{d.owner || "Not stated"}</Field>
             <Field label="Context">{d.context || "—"}{d.project ? ` · ${d.project}` : ""}</Field>
             <Field label="Why">{d.rationale || <span className="text-muted">No reason was stated in the source.</span>}</Field>
             <Field label="Participants">{d.participants.length ? d.participants.join(", ") : "Not recorded"}</Field>
-          </dl>
-          <Section title="Related actions" id="d-actions" count={d.related_commitments.length} icon="checkCircle">
+          </RookCard>
+          <Section title="Related actions" id="d-actions" count={d.related_commitments.length} icon="checkSquare">
             {d.related_commitments.length ? (
-              <ul className="space-y-1 text-sm">
-                {d.related_commitments.map((c) => (
-                  <li key={c.id}>
-                    <Link className="font-medium text-midnight hover:underline" href={`/commitments/${c.id}`}>{c.description}</Link>{" "}
-                    <span className="text-muted">· {c.owner} · <StatusText status={c.status} /></span>
-                  </li>
-                ))}
-              </ul>
+              <RookCard level={2} flush>
+                <ul className="divide-y divide-line">
+                  {d.related_commitments.map((c) => (
+                    <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
+                      <Link className="font-semibold text-midnight underline-offset-2 decoration-gold hover:underline" href={`/commitments/${c.id}`}>{c.description}</Link>
+                      <span className="text-[12px] text-muted">{c.owner}</span>
+                      <StatusText status={c.status} />
+                    </li>
+                  ))}
+                </ul>
+              </RookCard>
             ) : (
               <Empty title="No actions are linked to this decision yet." />
             )}

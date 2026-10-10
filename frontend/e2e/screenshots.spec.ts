@@ -1,71 +1,86 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { signIn } from "./helpers";
 
-/** Visual evidence for the PR (docs/screenshots). Run with CAPTURE_SCREENSHOTS=1. */
+/** Visual evidence for design review (docs/screenshots): every P0 screen, desktop + tablet + phone. Run with CAPTURE_SCREENSHOTS=1. */
 test.skip(!process.env.CAPTURE_SCREENSHOTS, "set CAPTURE_SCREENSHOTS=1 to refresh docs/screenshots");
+test.setTimeout(120_000);
 
 const OUT = "../docs/screenshots";
 
+async function shot(page: Page, name: string, fullPage = true) {
+  await page.waitForLoadState("networkidle");
+  await page.screenshot({ path: `${OUT}/${name}.png`, fullPage });
+}
+
 test("capture P0 screens", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/login");
   await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/00-login.png` });
+  await shot(page, "00-login", false);
   await signIn(page);
-  await page.screenshot({ path: `${OUT}/01-home.png`, fullPage: true });
-
-  await page.goto("/meetings");
-  await page.getByRole("link", { name: "Phoenix Product Review" }).click();
-  await expect(page.getByRole("heading", { level: 2, name: /^Purpose/ })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/02-meeting-preparation.png`, fullPage: true });
+  await shot(page, "01-home");
 
   await page.goto("/ask");
   await page.getByRole("button", { name: "What changed and what should I do?" }).click();
   const answer = page.getByRole("article");
   await expect(answer.locator('[data-unit-type="UNKNOWN"]')).toBeVisible();
   await answer.locator('[data-unit-type="INFERENCE"]').getByText(/Source · \d+ sources/).click();
-  await page.screenshot({ path: `${OUT}/03-ask-what-changed.png`, fullPage: true });
+  await shot(page, "02-ask");
   await answer.locator('[data-unit-type="RECOMMENDATION"]').getByRole("button", { name: "Draft follow-up" }).click();
   await expect(page.getByText("Nothing is sent until you approve")).toBeVisible();
-  await page.getByRole("region", { name: /Follow up with/ }).screenshot({ path: `${OUT}/04-followup-draft-approval.png` });
-
-  await page.goto("/risks");
-  await page.getByRole("link", { name: /Project Phoenix at risk/ }).click();
-  await expect(page.getByText("Why ROOK detected it")).toBeVisible();
-  await page.screenshot({ path: `${OUT}/05-risk-detail.png`, fullPage: true });
-
-  await page.goto("/decisions?tab=made");
-  await page.getByRole("link", { name: /Launch Project Phoenix/ }).click();
-  await expect(page.getByText("Decision owner", { exact: true })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/06-decision-detail.png`, fullPage: true });
-
-  await page.goto("/commitments?tab=waiting");
-  await expect(page.getByRole("heading", { level: 1, name: "Commitments" })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/07-commitments.png`, fullPage: true });
-
-  await page.goto("/sources");
-  await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/08-sources.png`, fullPage: true });
-
-  await page.goto("/evidence/1");
-  await expect(page.getByText("Source type", { exact: true })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/09-evidence.png`, fullPage: true });
+  await page.getByRole("region", { name: /Follow up with/ }).screenshot({ path: `${OUT}/13-followup-draft.png` });
 
   await page.goto("/meetings");
   await expect(page.getByRole("heading", { level: 1, name: "Meetings" })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/11-meetings.png`, fullPage: true });
-
-  await page.goto("/risks");
-  await expect(page.getByRole("heading", { level: 1, name: "Risks" })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/12-risks.png`, fullPage: true });
+  await shot(page, "03-meetings");
+  await page.getByRole("link", { name: "Phoenix Product Review" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: /^Purpose/ })).toBeVisible();
+  await shot(page, "04-meeting-detail");
 
   await page.goto("/decisions?tab=all");
   await expect(page.getByRole("heading", { level: 1, name: "Decisions" })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/13-decisions.png`, fullPage: true });
+  await shot(page, "05-decisions");
+  await page.getByRole("link", { name: /Launch Project Phoenix/ }).click();
+  await expect(page.getByText("Decision owner", { exact: true })).toBeVisible();
+  await shot(page, "06-decision-detail");
+
+  await page.goto("/commitments?tab=waiting");
+  await expect(page.getByRole("heading", { level: 1, name: "Commitments" })).toBeVisible();
+  await shot(page, "07-commitments");
+  await page.getByRole("link", { name: /financial forecast/ }).first().click();
+  await expect(page.getByText("Related decision", { exact: true })).toBeVisible();
+  await shot(page, "08-commitment-detail");
+
+  await page.goto("/risks");
+  await expect(page.getByRole("heading", { level: 1, name: "Risks" })).toBeVisible();
+  await shot(page, "09-risks");
+  await page.getByRole("link", { name: /Project Phoenix at risk/ }).click();
+  await expect(page.getByText("Why ROOK detected it")).toBeVisible();
+  await shot(page, "10-risk-detail");
+
+  await page.goto("/sources");
+  await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
+  await shot(page, "11-sources");
+
+  await page.goto("/evidence/1");
+  await expect(page.getByText("Source type", { exact: true })).toBeVisible();
+  await shot(page, "12-evidence");
+
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await shot(page, "14-home-tablet", false);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await page.screenshot({ path: `${OUT}/10-home-mobile.png` });
+  await shot(page, "15-home-mobile", false);
+  await page.goto("/login");
+  await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
+  await shot(page, "17-login-mobile");
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
+  await shot(page, "16-login-tablet", false);
 });

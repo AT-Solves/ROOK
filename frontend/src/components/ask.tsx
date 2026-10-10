@@ -6,11 +6,9 @@ import { ApiError, api } from "@/lib/api";
 import type { AskAnswer, Claim, ClaimType } from "@/lib/types";
 
 import { ActionControl, RecommendationClaim } from "./actions";
-import { RookMark } from "./brand";
 import { EvidenceList, SourceLine } from "./evidence";
-import { Icon, type IconName } from "./icons";
+import { RookAskBar, RookIcon, RookMark, type IconName } from "./rook";
 import { ClaimBadge, ConfidenceLabel } from "./trust";
-import { Button } from "./ui";
 
 export const MVP_QUESTIONS = [
   "What changed and what should I do?",
@@ -45,54 +43,41 @@ export function AskForm({ onAnswer, compact = false }: { onAnswer: (a: AskAnswer
 
   return (
     <div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit(q);
-        }}
-        className="flex flex-col gap-2 sm:flex-row"
-      >
-        <label htmlFor={inputId} className="sr-only">
-          Ask ROOK a question
-        </label>
-        <div className="relative min-w-0 flex-1">
-          <Icon name="search" size={18} accent className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-chess" />
-          <input
-            id={inputId}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Ask ROOK — e.g. “What changed and what should I do?”"
-            className="w-full rounded-[10px] border border-line-strong bg-white py-2.5 pl-10 pr-3 text-sm text-midnight placeholder:text-chess"
-            maxLength={1000}
-          />
-        </div>
-        <Button type="submit" variant="primary" rook={<RookMark tone="gold" size={18} />} disabled={busy || !q.trim()}>
-          {busy ? "Analyzing…" : "Ask ROOK"}
-        </Button>
-      </form>
+      <RookAskBar
+        inputId={inputId}
+        value={q}
+        onChange={setQ}
+        onSubmit={() => submit(q)}
+        busy={busy}
+        size={compact ? "standard" : "hero"}
+      />
       {!compact ? (
-        <div className="mt-3 flex flex-wrap gap-2" aria-label="Suggested questions">
-          {MVP_QUESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              disabled={busy}
-              onClick={() => submit(s)}
-              className="lift rounded-full border border-line bg-white px-3 py-1 text-xs text-ink-soft hover:border-gold hover:text-midnight"
-            >
-              {s}
-            </button>
-          ))}
+        <div className="mt-4">
+          <p className="rook-caps mb-2.5 text-muted">Try asking</p>
+          <div className="flex flex-wrap gap-2">
+            {MVP_QUESTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                disabled={busy}
+                onClick={() => submit(s)}
+                className="rook-interactive inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink-soft hover:border-gold hover:text-midnight disabled:opacity-55"
+              >
+                <RookIcon name="arrowRight" size={13} className="text-gold-deep" />
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
       {busy ? (
-        <p role="status" className="mt-2 flex items-center gap-2 text-sm text-muted">
+        <p role="status" className="mt-3 flex items-center gap-2 text-sm text-muted">
           <RookMark tone="midnight" size={16} className="animate-pulse" />
           Analyzing your permitted sources…
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-[var(--high-ink)]">
+        <p role="alert" className="mt-3 border-l-2 border-risk pl-3 text-sm text-[var(--risk-ink)]">
           {error}
         </p>
       ) : null}
@@ -104,7 +89,7 @@ function RecommendationList({ claims, id }: { claims: Claim[]; id: string }) {
   if (!claims.length) return null;
   return (
     <section aria-labelledby={id} className="mt-4">
-      <h3 id={id} className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
+      <h3 id={id} className="rook-caps text-ink-soft">
         Recommended action
       </h3>
       <ul className="mt-2 space-y-2">
@@ -120,22 +105,18 @@ function ClaimList({ title, claims, id }: { title: string; claims: Claim[]; id: 
   if (!claims.length) return null;
   return (
     <section aria-labelledby={id} className="mt-4">
-      <h3 id={id} className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
+      <h3 id={id} className="rook-caps text-ink-soft">
         {title}
       </h3>
       <ul className="mt-2 space-y-2">
         {claims.map((c, i) => (
-          <li key={i} className="rounded-[var(--radius-md)] border border-line bg-surface p-3">
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2.5">
-              <ClaimBadge type={c.claim_type} className="self-start" />
-              <div className="min-w-0">
-                <p className="text-sm text-ink">{c.text}</p>
-                {c.meta ? <p className="text-xs text-muted">{c.meta}</p> : null}
-              </div>
-            </div>
+          <li key={i} className="rounded-[var(--radius-md)] border border-line bg-surface p-4">
+            <ClaimBadge type={c.claim_type} />
+            <p className="mt-1.5 text-[14px] leading-relaxed text-midnight">{c.text}</p>
+            {c.meta ? <p className="text-[12px] text-muted">{c.meta}</p> : null}
             {c.detail ? <p className="mt-1 text-sm text-muted">{c.detail}</p> : null}
             {c.evidence.length ? (
-              <div className="mt-1">
+              <div className="mt-2">
                 <EvidenceList evidence={c.evidence} />
               </div>
             ) : null}
@@ -148,10 +129,10 @@ function ClaimList({ title, claims, id }: { title: string; claims: Claim[]; id: 
 
 /** Each claim type has its own heading, icon and edge — the four parts never rely on colour alone. */
 const UNIT_STYLE: Record<ClaimType, { icon: IconName; edge: string }> = {
-  FACT: { icon: "document", edge: "border-l-[var(--fact-dot)]" },
-  INFERENCE: { icon: "insight", edge: "border-l-[var(--inf-dot)]" },
+  FACT: { icon: "document", edge: "border-l-[var(--fact-mark)]" },
+  INFERENCE: { icon: "insight", edge: "border-l-[var(--inf-mark)]" },
   RECOMMENDATION: { icon: "target", edge: "border-l-gold" },
-  UNKNOWN: { icon: "search", edge: "border-l-[var(--unk-dot)] border-dashed" },
+  UNKNOWN: { icon: "search", edge: "border-l-[var(--unk-mark)] border-dashed" },
 };
 
 const UNIT_HEADING: Record<ClaimType, string> = {
@@ -164,24 +145,24 @@ const UNIT_HEADING: Record<ClaimType, string> = {
 /** Composite direct answer (C-008): one typed unit per kind of claim — never one label for the whole answer. */
 function DirectUnits({ units, id }: { units: Claim[]; id: string }) {
   return (
-    <ol aria-labelledby={id} className="mt-3 space-y-3">
+    <ol aria-labelledby={id} className="mt-5 space-y-3">
       {units.map((u, i) => (
-        <li key={i} className={`rounded-[var(--radius-md)] border border-line border-l-[3px] bg-surface p-3.5 shadow-[var(--shadow-card)] ${UNIT_STYLE[u.claim_type].edge}`} data-unit-type={u.claim_type}>
-          <div className="flex flex-wrap items-center gap-2">
-            <Icon name={UNIT_STYLE[u.claim_type].icon} size={16} accent className="text-midnight" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">{UNIT_HEADING[u.claim_type]}</span>
+        <li key={i} className={`rounded-[var(--radius-md)] border border-line border-l-2 bg-surface px-4 py-3.5 ${UNIT_STYLE[u.claim_type].edge}`} data-unit-type={u.claim_type}>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+            <RookIcon name={UNIT_STYLE[u.claim_type].icon} size={16} className="text-midnight" />
+            <span className="text-[13px] font-semibold text-midnight">{UNIT_HEADING[u.claim_type]}</span>
             <ClaimBadge type={u.claim_type} />
             {u.claim_type !== "UNKNOWN" ? <ConfidenceLabel value={u.confidence} /> : null}
           </div>
-          <p className="mt-1 text-[15px] leading-relaxed text-ink">{u.text}</p>
-          {u.basis ? <p className="mt-0.5 text-xs text-muted">{u.basis}</p> : null}
+          <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">{u.text}</p>
+          {u.basis ? <p className="mt-1 text-[12px] text-muted">{u.basis}</p> : null}
           {u.evidence.length ? (
-            <div className="mt-1">
+            <div className="mt-2">
               <EvidenceList evidence={u.evidence} label={u.claim_type === "RECOMMENDATION" ? "Based on" : "Source"} />
             </div>
           ) : null}
           {u.action ? (
-            <div className="mt-2">
+            <div className="mt-3">
               <ActionControl action={u.action} />
             </div>
           ) : null}
@@ -196,19 +177,22 @@ export function AnswerView({ a }: { a: AskAnswer }) {
   const base = useId();
   const keyPoints = a.what_changed.length || a.why_it_matters.length ? [] : a.key_points;
   return (
-    <article aria-labelledby={`${base}-q`} className="rounded-[var(--radius-lg)] border border-line bg-surface p-5 shadow-[var(--shadow-card)]">
-      <div className="flex items-center gap-2.5 border-b border-line pb-3">
-        <RookMark tone="midnight" size={20} />
-        <p id={`${base}-q`} className="font-[family-name:var(--font-display)] text-xl font-semibold text-midnight">
+    <article aria-labelledby={`${base}-q`} className="rounded-[var(--radius-lg)] border border-line bg-surface p-5 shadow-[var(--shadow-insight)] md:p-6">
+      <div className="flex items-center gap-3 border-b border-line pb-4">
+        <span aria-hidden className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-midnight">
+          <RookMark tone="gold" size={20} />
+        </span>
+        <p id={`${base}-q`} className="rook-display text-[1.6rem] text-midnight">
           {a.question}
         </p>
       </div>
       {a.composite ? (
         <>
-          <p className="mt-2 text-sm text-muted">{a.answer}</p>
+          <p className="mt-4 text-[14px] text-muted">{a.answer}</p>
           <DirectUnits units={a.units} id={`${base}-q`} />
           <details className="mt-4">
-            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
+            <summary className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-semibold text-ink-soft hover:text-midnight">
+              <RookIcon name="chevronRight" size={13} strokeWidth={2.2} className="rook-disclosure text-gold-deep" />
               All details · {a.what_changed.length + a.why_it_matters.length + a.recommended_actions.length + a.unknowns.length} statements
             </summary>
             <ClaimList title="What changed" claims={a.what_changed} id={`${base}-wc`} />
@@ -219,12 +203,12 @@ export function AnswerView({ a }: { a: AskAnswer }) {
         </>
       ) : (
         <>
-          <div className="mt-2 flex items-start gap-2">
-            {a.claim_type ? <ClaimBadge type={a.claim_type} className="mt-0.5" /> : null}
-            <p className="text-[15px] leading-relaxed text-ink">{a.answer}</p>
+          <div className="mt-4">
+            {a.claim_type ? <ClaimBadge type={a.claim_type} /> : null}
+            <p className="mt-2 text-[15px] leading-relaxed text-ink-soft">{a.answer}</p>
           </div>
           {a.confidence ? (
-            <p className="mt-1 pl-1">
+            <p className="mt-1">
               <ConfidenceLabel value={a.confidence} />
             </p>
           ) : null}
@@ -238,11 +222,13 @@ export function AnswerView({ a }: { a: AskAnswer }) {
       {!a.composite ? <RecommendationList claims={a.recommended_actions} id={`${base}-rec`} /> : null}
 
       {a.sources.length ? (
-        <details className="mt-4">
-          <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
-            Sources · {a.sources.length}
+        <details className="mt-5 border-t border-line pt-4">
+          <summary className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-semibold text-ink-soft hover:text-midnight">
+            <RookIcon name="chevronRight" size={13} strokeWidth={2.2} className="rook-disclosure text-gold-deep" />
+            <RookIcon name="database" size={14} className="text-chess" />
+            <span>Sources · {a.sources.length}</span>
           </summary>
-          <ul className="mt-2 space-y-2.5 border-l-2 border-gold/60 pl-3">
+          <ul className="mt-2.5 space-y-3 rounded-[var(--radius-sm)] bg-sunken px-3.5 py-3">
             {a.sources.map((s) => (
               <SourceLine key={s.signal_id} e={s} />
             ))}

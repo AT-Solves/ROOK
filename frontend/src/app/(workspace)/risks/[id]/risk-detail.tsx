@@ -6,8 +6,8 @@ import { RecommendationBlock } from "@/components/actions";
 import { CommitmentCard, DecisionCard } from "@/components/cards";
 import { EvidenceList } from "@/components/evidence";
 import { Empty, StateGate } from "@/components/states";
-import { ClaimBadge, ConfidenceLabel, LevelPill, StatusText } from "@/components/trust";
-import { Button, Field, PageHeader, Section } from "@/components/ui";
+import { RookButton, RookCard, RookField as Field, RookPageHeader, RookSection as Section } from "@/components/rook";
+import { LevelPill, StatusText, TrustRow } from "@/components/trust";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
@@ -20,24 +20,30 @@ export function RiskDetail({ id }: { id: number }) {
     <StateGate state={state} what="this risk" stage="Analyzing">
       {(r) => (
         <>
-          <PageHeader module="risks" title={r.title} subtitle={r.project ?? undefined} />
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <ClaimBadge type={r.claim_type} />
-            <LevelPill level={r.level} />
-            <ConfidenceLabel value={r.confidence} />
-            <span className="text-xs text-muted">{r.basis}</span>
-          </div>
-          <dl className="mb-10 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-1 shadow-[var(--shadow-card)]">
+          <RookPageHeader
+            size="detail"
+            eyebrow="Risk"
+            title={r.title}
+            tagline={r.project ?? undefined}
+            meta={<TrustRow type={r.claim_type} confidence={r.confidence} basis={r.basis}><LevelPill level={r.level} onDark /></TrustRow>}
+          />
+          <RookCard as="dl" level={1} flush className="mb-10 px-5 py-1 md:px-6">
             <Field label="Why ROOK detected it">{r.explanation}</Field>
-            <Field label="Severity">{r.level}</Field>
+            <Field label="Severity"><LevelPill level={r.level} /></Field>
             <Field label="Status"><StatusText status={r.status} /></Field>
             <Field label="Related project">{r.project ?? <span className="text-muted">Not linked</span>}</Field>
             <Field label="Last updated">{formatDateTime(r.detected_at)}</Field>
-          </dl>
+          </RookCard>
           <Section title="Suggested next step" id="r-next" icon="target">
-            {r.recommended_action ? <RecommendationBlock rec={r.recommended_action} riskId={r.id} /> : <Empty title="No suggested next step." />}
+            {r.recommended_action ? (
+              <RookCard level={2}>
+                <RecommendationBlock bare rec={r.recommended_action} riskId={r.id} />
+              </RookCard>
+            ) : (
+              <Empty title="No suggested next step." />
+            )}
             {r.status === "open" ? (
-              <Button
+              <RookButton
                 variant="quiet"
                 icon="checkCircle"
                 className="mt-3"
@@ -50,13 +56,13 @@ export function RiskDetail({ id }: { id: number }) {
                 }}
               >
                 Acknowledge
-              </Button>
+              </RookButton>
             ) : null}
           </Section>
           <Section title="Evidence" id="r-evidence" count={r.evidence.length} icon="attachment">
             <EvidenceList evidence={r.evidence} open />
           </Section>
-          <Section title="Related commitments" id="r-commitments" count={r.related_commitments?.length ?? 0} icon="checkCircle">
+          <Section title="Related commitments" id="r-commitments" count={r.related_commitments?.length ?? 0} icon="checkSquare">
             {r.related_commitments?.length ? <ul className="space-y-3">{r.related_commitments.map((c) => <CommitmentCard key={c.id} c={c} />)}</ul> : <Empty title="No commitments are linked to this risk." />}
           </Section>
           <Section title="Related decisions" id="r-decisions" count={r.related_decisions?.length ?? 0} icon="flag">

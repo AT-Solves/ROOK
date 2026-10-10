@@ -1,12 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" stop-color="#ecd3a6"/><stop offset="0.55" stop-color="#d4af7c"/><stop offset="1" stop-color="#a9834c"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="14" fill="#0b1220"/>
-  <g fill="url(#g)" transform="translate(5.5 5) scale(0.83)">
-    <path d="M17 9h7v5.5h5V9h6v5.5h5V9h7v14H17z"/><path d="M19 24.5h26v3.5H19z"/><path d="M23 29.5h18l1.6 15h-21.2z"/>
-    <path d="M19.5 46h25v3.5h-25z"/><path d="M15.5 51h33a2 2 0 0 1 2 2v4h-37v-4a2 2 0 0 1 2-2z"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0.2" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#ecd6ad"/><stop offset="0.5" stop-color="#d4af7c"/><stop offset="1" stop-color="#b48c55"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="#0b1220"/><g fill="url(#g)" transform="translate(6.4 6.4) scale(0.8)"><path d="M16 8h8v6h4V8h8v6h4V8h8v13H16z"/><path d="M18 22.5h28l-3.5 4h-21z"/><path fill-rule="evenodd" d="M22 28h20l2.2 16.5H19.8zM30.8 31.5v7h2.4v-7z"/><path d="M17.5 46h29v4h-29z"/><path d="M14 51.5h36a2 2 0 0 1 2 2V57H12v-3.5a2 2 0 0 1 2-2z"/></g></svg>

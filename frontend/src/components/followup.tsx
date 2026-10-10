@@ -6,9 +6,8 @@ import { ApiError, api } from "@/lib/api";
 import type { ActionProposal } from "@/lib/types";
 
 import { EvidenceList } from "./evidence";
+import { RookButton, RookIcon } from "./rook";
 import { ClaimBadge } from "./trust";
-import { Icon } from "./icons";
-import { Button } from "./ui";
 
 const TONES = ["executive", "concise", "diplomatic", "direct", "collaborative", "formal"] as const;
 
@@ -41,18 +40,18 @@ export function FollowupLauncher({ commitmentId, riskId, label = "Draft follow-u
       <label htmlFor={toneId} className="sr-only">
         Tone
       </label>
-      <select id={toneId} value={tone} onChange={(e) => setTone(e.target.value)} className="rounded-[10px] border border-line-strong bg-white px-2.5 py-2 text-sm text-midnight">
+      <select id={toneId} value={tone} onChange={(e) => setTone(e.target.value)} className="rounded-[var(--radius-sm)] border border-line-strong bg-surface px-2.5 py-2 text-[13px] font-medium text-midnight">
         {TONES.map((t) => (
           <option key={t} value={t}>
             {t[0].toUpperCase() + t.slice(1)} tone
           </option>
         ))}
       </select>
-      <Button variant="action" icon="send" onClick={create} disabled={busy}>
+      <RookButton variant="strategic" icon="send" onClick={create} disabled={busy}>
         {busy ? "Preparing draft…" : label}
-      </Button>
+      </RookButton>
       {error ? (
-        <p role="alert" className="w-full text-sm text-[var(--high-ink)]">
+        <p role="alert" className="w-full text-sm text-[var(--risk-ink)]">
           {error}
         </p>
       ) : null}
@@ -85,56 +84,58 @@ export function FollowupDraft({ initial, onClose }: { initial: ActionProposal; o
   }
 
   return (
-    <section aria-labelledby={ids.heading} className="mt-3 rounded-[var(--radius-md)] border border-line border-t-[3px] border-t-midnight bg-surface p-4 shadow-[var(--shadow-raised)]">
-      <div className="flex flex-wrap items-center gap-2">
-        <Icon name="send" size={18} accent className="text-midnight" />
-        <h3 id={ids.heading} className="text-sm font-semibold text-midnight">
+    <section aria-labelledby={ids.heading} className="mt-4 overflow-hidden rounded-[var(--radius-lg)] border border-line bg-surface shadow-[var(--shadow-raised)]">
+      <div className="rook-dark flex flex-wrap items-center gap-x-3 gap-y-2 bg-midnight px-5 py-3.5">
+        <RookIcon name="send" size={17} className="text-gold" />
+        <h3 id={ids.heading} className="text-[14px] font-semibold text-on-dark">
           {p.title}
         </h3>
         <ClaimBadge type="RECOMMENDATION" />
-        <span className="text-xs text-muted">Status: {p.status}</span>
+        <span className="ml-auto text-[12px] text-on-dark-muted">Status: {p.status}</span>
       </div>
+      <div className="p-5">
       {editable ? (
-        <p className="mt-3 flex items-center gap-2 rounded-[8px] border border-[#ecdcbf] bg-[var(--rec-bg)] px-3 py-2 text-sm text-[var(--rec-ink)]">
-          <Icon name="lock" size={16} accent className="text-[var(--rec-ink)]" />
+        <p className="flex items-center gap-2.5 border-l-2 border-gold bg-sunken px-3.5 py-2.5 text-[13px] font-medium text-midnight">
+          <RookIcon name="lock" size={16} className="text-gold-deep" />
           Nothing is sent until you approve. Review and edit the draft below.
         </p>
       ) : null}
 
       {p.payload.context ? (
-        <div className="mt-3 text-sm">
-          <p className="font-medium">Why ROOK suggests this</p>
-          <p className="mt-0.5 text-muted">{p.payload.context.why}</p>
-          <div className="mt-1">
+        <div className="mt-4 text-sm">
+          <p className="text-[12px] font-semibold text-midnight">Why ROOK suggests this</p>
+          <p className="mt-1 leading-relaxed text-ink-soft">{p.payload.context.why}</p>
+          <div className="mt-2">
             <EvidenceList evidence={p.payload.context.evidence} />
           </div>
         </div>
       ) : null}
 
-      <div className="mt-3 space-y-2 text-sm">
+      <div className="mt-4 space-y-3 text-sm">
         <p>
-          <span className="text-muted">To:</span> {p.payload.to.length ? p.payload.to.join(", ") : <em>recipient unknown</em>}
+          <span className="text-[12px] font-semibold text-muted">To</span>{" "}
+          <span className="text-midnight">{p.payload.to.length ? p.payload.to.join(", ") : <em>recipient unknown</em>}</span>
         </p>
         <div>
-          <label htmlFor={ids.subject} className="block text-xs font-medium text-muted">
+          <label htmlFor={ids.subject} className="block text-[12px] font-semibold text-muted">
             Subject
           </label>
           <input
             id={ids.subject}
-            className="mt-0.5 w-full rounded-[8px] border border-line-strong bg-white px-2.5 py-1.5"
+            className="mt-1 w-full rounded-[var(--radius-sm)] border border-line-strong bg-surface px-3 py-2 text-midnight"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             disabled={!editable}
           />
         </div>
         <div>
-          <label htmlFor={ids.body} className="block text-xs font-medium text-muted">
+          <label htmlFor={ids.body} className="block text-[12px] font-semibold text-muted">
             Message
           </label>
           <textarea
             id={ids.body}
             rows={8}
-            className="mt-0.5 w-full rounded-[8px] border border-line-strong bg-white px-2.5 py-1.5 font-[inherit] leading-relaxed"
+            className="mt-1 w-full rounded-[var(--radius-sm)] border border-line-strong bg-surface px-3 py-2 font-[inherit] leading-relaxed text-midnight"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             disabled={!editable}
@@ -143,30 +144,31 @@ export function FollowupDraft({ initial, onClose }: { initial: ActionProposal; o
       </div>
 
       {editable ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="approve" icon="checkCircle" onClick={() => run("approve")} disabled={!!busy}>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <RookButton variant="primary" icon="checkCircle" onClick={() => run("approve")} disabled={!!busy}>
             {busy === "approve" ? "Approving…" : "Approve and send"}
-          </Button>
-          <Button variant="quiet" onClick={() => run("reject")} disabled={!!busy}>
+          </RookButton>
+          <RookButton variant="quiet" onClick={() => run("reject")} disabled={!!busy}>
             {busy === "reject" ? "Discarding…" : "Discard draft"}
-          </Button>
+          </RookButton>
           {onClose ? (
-            <Button variant="quiet" onClick={onClose} disabled={!!busy}>
+            <RookButton variant="quiet" onClick={onClose} disabled={!!busy}>
               Close
-            </Button>
+            </RookButton>
           ) : null}
         </div>
       ) : (
-        <p role="status" className="mt-3 text-sm">
-          <span className="font-medium">{p.status === "executed" ? "Sent." : p.status === "rejected" ? "Draft discarded." : p.status === "blocked" ? "Blocked by policy." : "Approved."}</span>{" "}
+        <p role="status" className="mt-4 border-l-2 border-success pl-3 text-sm">
+          <span className="font-semibold text-midnight">{p.status === "executed" ? "Sent." : p.status === "rejected" ? "Draft discarded." : p.status === "blocked" ? "Blocked by policy." : "Approved."}</span>{" "}
           <span className="text-muted">{p.result}</span>
         </p>
       )}
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-[var(--high-ink)]">
+        <p role="alert" className="mt-2 text-sm text-[var(--risk-ink)]">
           {error}
         </p>
       ) : null}
+      </div>
     </section>
   );
 }

@@ -7,8 +7,8 @@ import { RiskCard } from "@/components/cards";
 import { EvidenceList } from "@/components/evidence";
 import { FollowupDraft, FollowupLauncher } from "@/components/followup";
 import { Empty, StateGate } from "@/components/states";
-import { ClaimBadge, ConfidenceLabel, StatusText } from "@/components/trust";
-import { Button, Field, PageHeader, Section } from "@/components/ui";
+import { RookButton as Button, RookCard, RookField as Field, RookPageHeader, RookSection as Section } from "@/components/rook";
+import { ClaimBadge, StatusText, TrustRow } from "@/components/trust";
 import { ApiError, api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { Commitment } from "@/lib/types";
@@ -30,40 +30,43 @@ function Detail({ c, reload }: { c: Commitment; reload: () => void }) {
   const history = (c.followups ?? []).filter((f) => f.status !== "draft");
   return (
     <>
-      <PageHeader module="commitments" title={c.description} subtitle={c.project ?? undefined} />
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <ClaimBadge type={c.claim_type} />
-        <ConfidenceLabel value={c.confidence} />
-        <span className="text-xs text-muted">{c.basis}</span>
-      </div>
-      <dl className="mb-10 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-1 shadow-[var(--shadow-card)]">
+      <RookPageHeader
+        size="detail"
+        eyebrow="Commitment"
+        title={c.description}
+        tagline={c.project ?? undefined}
+        meta={<TrustRow type={c.claim_type} confidence={c.confidence} basis={c.basis}><StatusText status={c.status} onDark /></TrustRow>}
+      />
+      <RookCard as="dl" level={1} flush className="mb-10 px-5 py-1 md:px-6">
         <Field label="Owner">{c.kind === "inferred" && c.status === "proposed" ? <span className="text-muted">No owner — ROOK inferred this action</span> : c.owner}</Field>
         <Field label="Due">{c.due_date ? formatDate(c.due_date) : "Not stated"}</Field>
         <Field label="Status">
           <StatusText status={c.status} />
           {c.status_basis ? (
-            <span className="ml-2 inline-flex items-center gap-1 text-xs text-muted"><ClaimBadge type={c.status_claim_type} /> {c.status_basis}</span>
+            <span className="ml-3 inline-flex flex-wrap items-center gap-2 text-[12px] text-muted"><ClaimBadge type={c.status_claim_type} /> {c.status_basis}</span>
           ) : null}
         </Field>
         <Field label="Source">{c.evidence[0] ? `${c.evidence[0].title} (${c.evidence[0].channel})` : "—"}</Field>
         <Field label="Related decision">
           {c.related_decision ? (
             <span>
-              <Link className="font-medium text-midnight hover:underline" href={`/decisions/${c.related_decision.id}`}>{c.related_decision.code} · {c.related_decision.statement}</Link>{" "}
-              <ClaimBadge type={c.related_decision.claim_type} /> <span className="text-xs text-muted">{c.related_decision.basis}</span>
+              <Link className="font-semibold text-midnight underline-offset-2 decoration-gold hover:underline" href={`/decisions/${c.related_decision.id}`}>{c.related_decision.code} · {c.related_decision.statement}</Link>{" "}
+              <span className="mt-1.5 flex flex-wrap items-center gap-2"><ClaimBadge type={c.related_decision.claim_type} /> <span className="text-[12px] text-muted">{c.related_decision.basis}</span></span>
             </span>
           ) : (
             <span className="text-muted">None linked</span>
           )}
         </Field>
         <Field label="Project">{c.project ?? <span className="text-muted">Not linked</span>}</Field>
-      </dl>
+      </RookCard>
 
       <Section title="Follow-up options" id="c-followup" icon="send">
-        <FollowupOptions c={c} riskId={delayRisk?.id} reload={reload} />
+        <RookCard level={2}>
+          <FollowupOptions c={c} riskId={delayRisk?.id} reload={reload} />
+        </RookCard>
         {drafts.map((d) => <FollowupDraft key={d.id} initial={d} />)}
         {history.length ? (
-          <ul className="mt-3 space-y-1 text-xs text-muted">
+          <ul className="mt-3 space-y-1 text-[12px] text-muted">
             {history.map((h) => <li key={h.id}>{h.title}: {h.status}{h.result ? ` — ${h.result}` : ""}</li>)}
           </ul>
         ) : null}
@@ -99,10 +102,10 @@ function FollowupOptions({ c, riskId, reload }: { c: Commitment; riskId?: number
       <div className="space-y-2">
         <p className="text-sm text-muted">This is an inferred action. It is not tracked until you accept it.</p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="action" icon="person" disabled={busy} onClick={() => run(() => api.acceptCommitment(c.id))}>Take it on myself</Button>
+          <Button variant="secondary" icon="person" disabled={busy} onClick={() => run(() => api.acceptCommitment(c.id))}>Take it on myself</Button>
           <Button variant="quiet" disabled={busy} onClick={() => run(() => api.dismissCommitment(c.id))}>Dismiss</Button>
         </div>
-        {error ? <p role="alert" className="text-sm text-[var(--high-ink)]">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-[var(--risk-ink)]">{error}</p> : null}
       </div>
     );
   }
@@ -111,7 +114,7 @@ function FollowupOptions({ c, riskId, reload }: { c: Commitment; riskId?: number
     <div className="space-y-3">
       {!c.mine ? <FollowupLauncher commitmentId={c.id} riskId={riskId} /> : null}
       <Button variant="quiet" icon="checkCircle" disabled={busy} onClick={() => run(() => api.completeCommitment(c.id))}>Mark as done</Button>
-      {error ? <p role="alert" className="text-sm text-[var(--high-ink)]">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-[var(--risk-ink)]">{error}</p> : null}
     </div>
   );
 }

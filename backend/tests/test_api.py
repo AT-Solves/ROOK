@@ -144,3 +144,12 @@ def test_detail_hides_restricted_items_from_non_participants(client):
     assert client.get(f"/api/decisions/{did}", headers=marcus).status_code == 404
     assert client.get(f"/api/commitments/{cid}", headers=marcus).status_code == 404
     assert client.get(f"/api/meetings/{m['id']}/prep", headers=marcus).status_code == 404
+
+
+def test_timezone_accepts_legacy_browser_aliases(client):
+    """Chromium/Edge report India as 'Asia/Calcutta'; it must be accepted, not rejected with 422."""
+    h = login(client)
+    for tz in ("Asia/Calcutta", "Asia/Kolkata", "America/New_York"):
+        r = client.patch("/api/me", json={"timezone": tz}, headers=h)
+        assert r.status_code == 200 and r.json()["timezone"] == tz
+    assert client.patch("/api/me", json={"timezone": "Mars/Olympus"}, headers=h).status_code == 422

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * ROOK icon family (design reference: "Feature icons", "App icons", "Evidence type icons").
+ * ROOK icon family: navigation, feature and evidence-type icons share one geometry.
  * One geometry: 24px grid, 1.75 stroke, round joins. `accent` renders the highlight parts in Rook Gold
  * (feature-icon style); without it the icon is monochrome (navigation style). Icons are decorative unless
  * given a `label`, in which case they are announced to assistive technology.
@@ -41,13 +41,15 @@ const ICONS = {
   chat: { base: <path d="M12 4c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.1-2.9-.4L4.5 19.5l1.2-3.6C4.3 14.6 3.5 12.9 3.5 11c0-3.9 3.8-7 8.5-7z" /> },
   globe: { base: <><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17" /></>, accent: <path d="M12 3.5c2.4 2.6 3.5 5.4 3.5 8.5s-1.1 5.9-3.5 8.5c-2.4-2.6-3.5-5.4-3.5-8.5s1.1-5.9 3.5-8.5z" /> },
   lock: { base: <rect x="5" y="10.5" width="14" height="10" rx="2" />, accent: <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /> },
+  logout: { base: <path d="M14 4.5H6.5v15H14" />, accent: <path d="M10.5 12h10M17 8.5l3.5 3.5-3.5 3.5" /> },
+  chevronDown: { base: <path d="m6 9.5 6 6 6-6" /> },
   external: { base: <path d="M18 14v6H4V6h6" />, accent: <path d="M14 4h6v6M20 4l-9 9" /> },
   briefcase: { base: <><rect x="3.5" y="7.5" width="17" height="12.5" rx="2" /><path d="M9 7.5V5.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>, accent: <path d="M3.5 12.5h17" /> },
 } satisfies Record<string, Parts>;
 
 export type IconName = keyof typeof ICONS;
 
-export function Icon({
+export function RookIcon({
   name,
   size = 20,
   accent = false,
@@ -85,39 +87,16 @@ export function Icon({
   );
 }
 
-/** Navigation modules → icon + coloured app-icon tile (design reference "App icons (coloured)"). */
-export const MODULES = {
-  home: { icon: "home", tile: "bg-midnight text-gold" },
-  ask: { icon: "ask", tile: "bg-chess text-white" },
-  meetings: { icon: "calendar", tile: "bg-[#24426b] text-white" },
-  decisions: { icon: "document", tile: "bg-gold text-midnight" },
-  commitments: { icon: "checkSquare", tile: "bg-[#15803d] text-white" },
-  risks: { icon: "risk", tile: "bg-[#b91c1c] text-white" },
-  sources: { icon: "database", tile: "bg-slate text-white" },
-} as const satisfies Record<string, { icon: IconName; tile: string }>;
+/** Navigation modules → icon. One icon family, one colour logic: Midnight/Board Light glyphs, gold for the
+ *  active or highlighted state. No per-module colour tiles. */
+export const MODULE_ICON = {
+  home: "home",
+  ask: "ask",
+  meetings: "calendar",
+  decisions: "document",
+  commitments: "checkSquare",
+  risks: "risk",
+  sources: "database",
+} as const satisfies Record<string, IconName>;
 
-export type ModuleName = keyof typeof MODULES;
-
-export function ModuleTile({ module, size = 40 }: { module: ModuleName; size?: number }) {
-  const m = MODULES[module];
-  return (
-    <span aria-hidden className={`inline-flex shrink-0 items-center justify-center rounded-[10px] ${m.tile}`} style={{ width: size, height: size }}>
-      <Icon name={m.icon} size={Math.round(size * 0.55)} />
-    </span>
-  );
-}
-
-/** Feature icon tile: white square, dark glyph with gold accents. */
-export function FeatureTile({ name, size = 36, label }: { name: IconName; size?: number; label?: string }) {
-  return (
-    <span
-      className="inline-flex shrink-0 items-center justify-center rounded-[9px] border border-line bg-white text-midnight shadow-[var(--shadow-card)]"
-      style={{ width: size, height: size }}
-      role={label ? "img" : undefined}
-      aria-label={label}
-      aria-hidden={label ? undefined : true}
-    >
-      <Icon name={name} size={Math.round(size * 0.56)} accent />
-    </span>
-  );
-}
+export type ModuleName = keyof typeof MODULE_ICON;

@@ -25,7 +25,7 @@ Any frontend work, UI copy, or API shape decision driven by a screen.
   `evidence.tsx` (collapsed evidence), `states.tsx` (loading, empty, error, permission-denied), and
   `followup.tsx` (draft → explicit approval). See ADR-0007.
 - **Home** sections per UX §4 and MVP P0: Needs Attention, Today, Decisions, Commitments,
-  Waiting For, At Risk, Recent Changes. The header shows greeting, date and refresh state.
+  Waiting on others (C-009; UX §4 "Waiting For"), At Risk, Recent Changes. The header shows greeting, date and refresh state.
 - **Ask ROOK answers** are structured: direct answer, key points, recommended action, evidence,
   sources, and confidence when useful. No walls of text.
 - **Detail pages** (decision, commitment, risk, meeting) contain exactly the fields listed in UX
@@ -35,7 +35,7 @@ Any frontend work, UI copy, or API shape decision driven by a screen.
 - **States**: every screen has a meaningful empty state, progressive loading states (Connecting
   → Syncing → Analyzing → Preparing → Ready), and errors that say what failed, what the user can
   do, and whether partial results are shown (UX §12–14).
-- **Visual**: the ROOK chess-inspired design system (`docs/design/DESIGN_SYSTEM.md`, ADR-0008) —
+- **Visual**: the ROOK design system v2 (`docs/design/DESIGN_SYSTEM.md`, ADR-0008; primitives in `frontend/src/components/rook/`, imported from `@/components/rook`) —
   Midnight/Rook Gold palette, geometric rook logo, one icon family, board-texture motifs. Use its tokens and
   shared components; never style page by page or introduce other palettes, icon sets or logos. Gold is an
   accent, never body text on light surfaces. Desktop first, and responsive for tablet and phone briefing (UX §16, §18).

@@ -1,10 +1,9 @@
 "use client";
 
 import { SourceIcon } from "@/components/evidence";
-import { Icon } from "@/components/icons";
+import { RookCard, RookField as Field, RookIcon as Icon, RookPageHeader, RookSectionHeader } from "@/components/rook";
 import { StateGate } from "@/components/states";
 import { ClaimBadge } from "@/components/trust";
-import { Field, PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
@@ -24,8 +23,8 @@ export function EvidenceDetail({ id }: { id: number }) {
     <StateGate state={state} what="this source">
       {(s) => (
         <>
-          <PageHeader module="sources" title={s.title} subtitle="Original source" />
-          <dl className="mb-10 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-1 shadow-[var(--shadow-card)]">
+          <RookPageHeader size="detail" eyebrow="Original source" title={s.title} tagline={`${s.channel} · ${s.author || "System"} · ${formatDateTime(s.occurred_at)}`} />
+          <RookCard as="dl" level={1} flush className="mb-10 px-5 py-1 md:px-6">
             <Field label="Source type">
               <span className="inline-flex items-center gap-2">
                 <SourceIcon e={s} size={24} />
@@ -34,18 +33,18 @@ export function EvidenceDetail({ id }: { id: number }) {
             </Field>
             <Field label="Author">{s.author || "System"}</Field>
             <Field label="Timestamp">{formatDateTime(s.occurred_at)}</Field>
-            <Field label="Visibility">{s.visibility === "restricted" ? <span className="inline-flex items-center gap-1.5"><Icon name="lock" size={14} accent />{`Restricted to ${s.participants.length} participant${s.participants.length === 1 ? "" : "s"}`}</span> : "Visible across your organisation"}</Field>
+            <Field label="Visibility">{s.visibility === "restricted" ? <span className="inline-flex items-center gap-1.5"><Icon name="lock" size={14} className="text-gold-deep" />{`Restricted to ${s.participants.length} participant${s.participants.length === 1 ? "" : "s"}`}</span> : "Visible across your organisation"}</Field>
             <Field label="Original">
-              {s.url ? <a className="inline-flex items-center gap-1.5 font-medium text-midnight underline underline-offset-2" href={s.url} target="_blank" rel="noreferrer noopener"><Icon name="external" size={15} accent />Open in {s.channel}</a> : <span className="text-muted">No link available for this source</span>}
+              {s.url ? <a className="inline-flex items-center gap-1.5 font-semibold text-midnight underline decoration-gold underline-offset-2" href={s.url} target="_blank" rel="noreferrer noopener"><Icon name="external" size={15} className="text-gold-deep" />Open in {s.channel}</a> : <span className="text-muted">No link available for this source</span>}
             </Field>
-          </dl>
+          </RookCard>
           <section aria-labelledby="ev-content">
-            <div className="mb-2 flex items-center gap-2">
-              <h2 id="ev-content" className="gold-rule text-[12px] font-semibold uppercase tracking-[0.18em] text-ink-soft">Content</h2>
+            <RookSectionHeader id="ev-content" title="Content" icon="document" />
+            <div className="mb-3 flex flex-wrap items-center gap-2.5">
               <ClaimBadge type="FACT" />
-              <span className="text-xs text-muted">Shown exactly as captured; ROOK has not changed it.</span>
+              <span className="text-[12px] text-muted">Shown exactly as captured; ROOK has not changed it.</span>
             </div>
-            <pre className="whitespace-pre-wrap rounded-[var(--radius-md)] border border-line border-l-[3px] border-l-gold bg-surface p-4 font-[inherit] text-sm leading-relaxed shadow-[var(--shadow-card)]">{s.body}</pre>
+            <pre className="whitespace-pre-wrap rounded-[var(--radius-md)] border border-line border-l-2 border-l-gold bg-surface p-5 font-[inherit] text-[14px] leading-relaxed text-ink-soft shadow-[var(--shadow-card)]">{s.body}</pre>
           </section>
         </>
       )}

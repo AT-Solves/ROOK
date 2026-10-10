@@ -66,3 +66,10 @@ Precedence: 04 Principles > 00 Vision > 01 PRD > 02 MVP Scope > 03 UX/UI Spec > 
 ### C-006 — Environment variable names for Microsoft credentials
 - **Artifacts:** product-owner decision 2026-10-07 names `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`; the prototype used a `ROOK_` prefix.
 - **Resolution:** The owner's names are used unprefixed (informational; no product impact).
+
+### C-009 — "Waiting for you" metric label on Home
+- **Artifacts:** design-system rebuild brief (2026-10-10) lists the Home metric as **WAITING FOR YOU**; 03_UX_UI_SPEC §4 and MVP P0 name the section **Waiting For**; the API field `counts.waiting_for` counts commitments **other people owe the user**.
+- **Conflict:** "Waiting for you" reads as *items waiting on the user* — the opposite of what the number counts. Relabelling it would silently change what the metric means.
+- **Options:** (a) keep **Waiting for** (current; matches the UX spec and the Home section it links to); (b) use **Waiting on others** for clarity; (c) use **Waiting for you** and change the count to items blocked on the user (a product/API change).
+- **Recommendation:** (a). The visual rebuild ships with (a); no behaviour changed.
+- **Resolution (product owner, 2026-10-10):** **"Waiting on others".** "Waiting for you" implies people are waiting for the leader; "Waiting on others" means the leader is waiting for another person, team or system. Terminology only — `counts.waiting_for` and the underlying data are unchanged. Applied to the Home metric, the matching Home section and the Commitments tab. Distinction kept: *Your commitments* = owned by the user; *Waiting on others* = commitments/dependencies the user is waiting for.
