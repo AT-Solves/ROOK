@@ -6,7 +6,7 @@ import { RookThemeProvider } from "@/components/rook/theme";
 import "./globals.css";
 
 /* Typography: Cinzel — the ROOK wordmark; Cormorant Garamond — editorial headings; Inter — UI and body text.
-   Self-hosted from npm (@fontsource), so builds never depend on a font CDN. */
+   Self-hosted from npm (@fontsource), so builds never depend on a font CDN. Only the weights in use are shipped. */
 const inter = localFont({
   src: [
     { path: "../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2", weight: "100 900", style: "normal" },
@@ -18,16 +18,20 @@ const cormorant = localFont({
   src: [
     { path: "../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-500-normal.woff2", weight: "500", style: "normal" },
     { path: "../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-600-normal.woff2", weight: "600", style: "normal" },
-    { path: "../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-700-normal.woff2", weight: "700", style: "normal" },
-    { path: "../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-500-italic.woff2", weight: "500", style: "italic" },
   ],
   variable: "--font-cormorant",
   display: "swap",
 });
+/* Italic is only used in evidence quotes, which start collapsed: load it on demand instead of preloading it. */
+const cormorantItalic = localFont({
+  src: [{ path: "../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-500-italic.woff2", weight: "500", style: "italic" }],
+  variable: "--font-cormorant-italic",
+  display: "swap",
+  preload: false,
+});
 const cinzel = localFont({
   src: [
     { path: "../../node_modules/@fontsource/cinzel/files/cinzel-latin-600-normal.woff2", weight: "600", style: "normal" },
-    { path: "../../node_modules/@fontsource/cinzel/files/cinzel-latin-700-normal.woff2", weight: "700", style: "normal" },
   ],
   variable: "--font-cinzel",
   display: "swap",
@@ -40,7 +44,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${inter.variable} ${cormorant.variable} ${cinzel.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${cormorant.variable} ${cormorantItalic.variable} ${cinzel.variable} h-full antialiased`}>
       <body className="min-h-full">
         <RookThemeProvider>{children}</RookThemeProvider>
       </body>
