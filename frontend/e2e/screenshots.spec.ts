@@ -16,7 +16,7 @@ async function shot(page: Page, name: string, fullPage = true) {
 test("capture P0 screens", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/login");
-  await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Microsoft" })).toBeVisible();
   await shot(page, "00-login", false);
   await signIn(page);
   await shot(page, "01-home-1440x900", false);
@@ -96,10 +96,10 @@ test("capture P0 screens", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await shot(page, "15-home-mobile", false);
   await page.goto("/login");
-  await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Microsoft" })).toBeVisible();
   await shot(page, "17-login-mobile");
   await page.setViewportSize({ width: 900, height: 1100 });
   await page.reload();
-  await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Microsoft" })).toBeVisible();
   await shot(page, "16-login-tablet", false);
 });
