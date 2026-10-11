@@ -1,6 +1,6 @@
 # ADR-0004 — Identity provider abstraction; Microsoft Entra ID first
 
-- **Status:** accepted (product-owner decision 2026-10-07)
+- **Status:** accepted (product-owner decision 2026-10-07). **Tenant mapping, ID-token validation, admin assignment and dev login are superseded by ADR-0011 (multi-tenant, 2026-10-11).**
 - **Decision:**
   - `backend/rook/identity/` defines an `IdentityProvider` interface (authorisation URL, code exchange, claim validation). `EntraIdProvider` is the first implementation (OIDC authorisation-code flow with PKCE, confidential client).
   - Login state (`state`, `nonce`, PKCE verifier, purpose, return path) is stored server-side in `auth_states`, is single-use, and expires after 10 minutes.

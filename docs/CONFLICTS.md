@@ -90,3 +90,14 @@ Precedence: 04 Principles > 00 Vision > 01 PRD > 02 MVP Scope > 03 UX/UI Spec > 
 ### C-013 — Milestone naming
 - **Artifacts:** `docs/MVP_PLAN.md` uses "M4" for the Microsoft 365 connector + Entra sign-in (code complete, awaiting live configuration); the product owner's "do not start M4" refers to the next milestone.
 - **Resolution (product owner, 2026-10-10):** This work is **M3.5**. The next milestone stays unstarted.
+
+### C-014 — Single-tenant vs multi-tenant Microsoft identity
+- **Artifacts:** ADR-0004 and `docs/integrations/microsoft365.md` described a single-tenant MVP (only `MICROSOFT_TENANT_ID` may sign in; admins from `ROOK_ADMIN_EMAILS`). PRD lists multi-tenant isolation as an NFR; the product-owner brief (2026-10-10/11) requires any Microsoft organizational tenant to sign in to its own ROOK organization.
+- **Resolution (product owner, 2026-10-11):** **Multi-tenant approved.**
+  - Identity = (tenant id, object id); the validated tenant id is the organization identity.
+  - The first user of a new tenant owns the new organization; later users join as members.
+  - JWKS signature validation is required.
+  - Demo login is limited to the demo organization.
+  - `ROOK_ENVIRONMENT` guards production.
+  - The session cookie change is deferred to a separate hardening PR.
+  - Recorded in ADR-0011.
