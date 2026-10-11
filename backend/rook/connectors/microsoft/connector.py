@@ -39,7 +39,7 @@ class Microsoft365Connector(BaseConnector):
     phase = 1
     delegated = True
     can_send = True
-    required_env = ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT_ID")
+    required_env = ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET")  # multi-tenant: no fixed tenant (ADR-0011)
     scopes = DATA_SCOPES
     data_types = (
         DataType("mail", "conversations", "Outlook mail", ("Mail.Read",)),

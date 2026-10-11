@@ -20,12 +20,24 @@ def utcnow() -> datetime:
 
 
 class Organization(Base):
+    """One customer organization. For Microsoft sign-in it maps to exactly one Entra tenant (ADR-0011): the validated
+    token's ``tid`` is the authoritative organization identity, never anything the browser sends."""
+
     __tablename__ = "organizations"
+    __table_args__ = (UniqueConstraint("identity_provider", "tenant_id"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str] = mapped_column(String(100), unique=True)
     # Identity-provider tenant this org maps to, e.g. "entra:<tenant-id>" (ADR-0004). Provider-neutral string.
     external_ref: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
+    identity_provider: Mapped[str | None] = mapped_column(String(40), nullable=True)  # "microsoft"
+    tenant_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # Entra tenant id (GUID)
+    status: Mapped[str] = mapped_column(String(20), default="active")  # setup | active
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)  # the first user: initial owner/admin
+    setup_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)  # the synthetic workspace; only it allows demo login
+    # How users from the same tenant join: "auto" (as members). "approval" is reserved for a later admin-approval flow.
+    join_policy: Mapped[str] = mapped_column(String(20), default="auto")
     # AI action policy (§19, §53). Keys: create_task, send_email, send_message -> "never" | "approval" | "auto"
     ai_policy: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -33,7 +45,7 @@ class Organization(Base):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (UniqueConstraint("org_id", "email"),)
+    __table_args__ = (UniqueConstraint("org_id", "email"), UniqueConstraint("org_id", "external_subject"))
     id: Mapped[int] = mapped_column(primary_key=True)
     org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
     email: Mapped[str] = mapped_column(String(200))
@@ -41,7 +53,8 @@ class User(Base):
     title: Mapped[str] = mapped_column(String(200), default="")
     role: Mapped[str] = mapped_column(String(20), default="member")  # admin | member
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")  # IANA name; "today" is computed in it
-    # Stable subject at the identity provider, e.g. "entra:<oid>" (never the email, which can change).
+    # Stable subject at the identity provider, "microsoft:<oid>"; with the org's tenant it is the user's identity
+    # (tenant id, object id). Never the email, which tenant admins can change.
     external_subject: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
 
 
@@ -252,6 +265,9 @@ class ConnectorCredential(Base):
     org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
     connector_id: Mapped[int] = mapped_column(ForeignKey("connectors.id"), unique=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # Who granted these tokens at the provider: tenant id and "microsoft:<oid>". Refresh uses this tenant's authority.
+    tenant_id: Mapped[str] = mapped_column(String(64), default="")
+    external_subject: Mapped[str] = mapped_column(String(200), default="")
     refresh_token_enc: Mapped[str] = mapped_column(Text, default="")
     access_token_enc: Mapped[str] = mapped_column(Text, default="")
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

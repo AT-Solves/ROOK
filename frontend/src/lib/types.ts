@@ -350,7 +350,16 @@ export interface SignalDetail extends EvidenceRef {
 
 export interface Me {
   user: { id: number; email: string; name: string; title: string; role: "admin" | "member"; org_id: number; timezone: string };
-  org: { id: number; name: string };
+  org: {
+    id: number;
+    name: string;
+    status: "setup" | "active";
+    is_demo: boolean;
+    identity_provider: string | null;
+    is_owner: boolean;
+    /** True only for an administrator of an organization that has not completed setup. */
+    setup_required: boolean;
+  };
   llm: string;
 }
 

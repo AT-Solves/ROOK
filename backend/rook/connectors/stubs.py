@@ -41,7 +41,7 @@ class GoogleCalendarConnector(_PendingConnector):
 class SharePointConnector(_PendingConnector):
     kind, display_name, category, phase = "sharepoint", "SharePoint / OneDrive", "documents", 2
     data_types = (DataType("files", "documents", "Files"), DataType("sites", "documents", "Sites"),)
-    required_env = ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT_ID")
+    required_env = ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET")  # multi-tenant: no fixed tenant (ADR-0011)
     scopes = ("Sites.Read.All", "Files.Read.All")
 
 

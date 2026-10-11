@@ -5,7 +5,7 @@ import { restrictedSignalId, signIn } from "./helpers";
 test("unauthenticated visitors are sent to sign in", async ({ page }) => {
   await page.goto("/risks");
   await expect(page).toHaveURL(/\/login\?return_to=%2Frisks/);
-  await expect(page.getByRole("heading", { name: "Sign in with your organization" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Use your Microsoft work or school account." })).toBeVisible();
   // Microsoft stays the primary path; without server configuration it is shown as unavailable, with the reason.
   const ms = page.getByRole("button", { name: "Continue with Microsoft" });
   await expect(ms).toBeDisabled();

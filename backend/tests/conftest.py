@@ -31,7 +31,8 @@ def session_factory():
     with factory() as db:
         # A zone where it is mid-morning right now: a realistic working day whenever the suite runs.
         ensure_demo_tenant(db, timezone=demo_morning_timezone(utcnow()))
-    return factory
+    yield factory
+    engine.dispose()  # close pooled connections: one engine per test would otherwise exhaust Postgres' max_connections
 
 
 @pytest.fixture()
@@ -64,16 +65,15 @@ from urllib.parse import parse_qs, unquote, urlparse  # noqa: E402
 from rook.connectors.microsoft import Microsoft365Connector  # noqa: E402
 from rook.identity.microsoft import EntraIdProvider, set_provider_for_tests  # noqa: E402
 from rook.models import AuthState  # noqa: E402
-from tests.fixtures.m365 import CLIENT_ID, ME, TENANT, FakeM365  # noqa: E402
+from tests.fixtures.m365 import CLIENT_ID, FakeM365  # noqa: E402
 
 
 @pytest.fixture()
 def m365(monkeypatch):
     monkeypatch.setenv("MICROSOFT_CLIENT_ID", CLIENT_ID)
     monkeypatch.setenv("MICROSOFT_CLIENT_SECRET", "test-secret-not-real")
-    monkeypatch.setenv("MICROSOFT_TENANT_ID", TENANT)
-    monkeypatch.setenv("ROOK_ADMIN_EMAILS", ME)
-    monkeypatch.setenv("ROOK_ORG_NAME", "Contoso")
+    for name in ("MICROSOFT_TENANT_ID", "MICROSOFT_ALLOWED_TENANT_IDS", "ROOK_ADMIN_EMAILS", "ROOK_ORG_NAME"):
+        monkeypatch.delenv(name, raising=False)  # multi-tenant: any organizational tenant may sign in
     fake = FakeM365()
     set_provider_for_tests(EntraIdProvider(transport=fake.transport()))
     monkeypatch.setattr(Microsoft365Connector, "transport_override", fake.transport())
@@ -86,6 +86,13 @@ def _complete_oauth(client, session_factory, fake, authorize_url: str, code: str
     with session_factory() as db:
         fake.nonce = db.query(AuthState).filter_by(state=state).one().nonce
     return client.get(f"/api/auth/microsoft/callback?code={code}&state={state}", follow_redirects=False)
+
+
+def session_for(user) -> dict:
+    """A ROOK session for any user (as the sign-in callback would issue it), for tests outside the demo org."""
+    from rook.auth import issue_token
+
+    return {"Authorization": f"Bearer {issue_token(user)}"}
 
 
 def entra_sign_in(client, session_factory, fake) -> dict:

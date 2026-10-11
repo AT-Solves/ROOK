@@ -106,6 +106,16 @@ test("capture P0 screens", async ({ page }) => {
   await shot(page, "19-home-no-critical-situation", false);
   await page.unroute("**/api/brief");
 
+  // First administrator of a new Microsoft organization (ADR-0011); /api/me as the API reports it for that user.
+  await page.route("**/api/me", async (route) => {
+    const real = await (await route.fetch()).json();
+    await route.fulfill({ json: { ...real, org: { ...real.org, name: "Fabrikam", status: "setup", is_demo: false, is_owner: true, setup_required: true } } });
+  });
+  await page.goto("/setup");
+  await expect(page.getByLabel("Organization name")).toBeVisible();
+  await shot(page, "21-setup", false);
+  await page.unroute("**/api/me");
+
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

@@ -52,6 +52,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     api
       .me()
       .then((m) => {
+        if (m.org.setup_required) {
+          router.replace("/setup"); // the first administrator of a new organization confirms it first
+          return;
+        }
         setMe(m);
         // "Today" is computed in the user's time zone (R08): keep it in sync with the browser.
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;

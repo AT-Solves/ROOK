@@ -95,6 +95,7 @@ export const api = {
   devLogin: (email: string) => request<{ token: string }>("/auth/login", { method: "POST", json: { email } }),
   me: () => request<Me>("/me"),
   setTimezone: (timezone: string) => request<Me["user"]>("/me", { method: "PATCH", json: { timezone } }),
+  completeOrgSetup: (name: string) => request<Me["org"]>("/org/setup", { method: "POST", json: { name } }),
 
   // ---------------------------------------------------------------- brief / ask
   brief: () => request<Brief>("/brief"),

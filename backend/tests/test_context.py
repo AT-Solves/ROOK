@@ -42,8 +42,14 @@ def test_unbuilt_sources_are_never_offered_as_connectable(client):
     assert {"Slack", "GitHub", "Zoom"} <= set(groups)
 
 
+def test_microsoft_365_is_connectable_without_a_fixed_tenant(client, session_factory, m365):
+    # multi-tenant (ADR-0011): client id and secret are all the server needs; MICROSOFT_TENANT_ID is not required
+    ms = next(s for s in _ctx(client, entra_sign_in(client, session_factory, m365))["sources"] if s["kind"] == "microsoft365")
+    assert ms["setup_required"] is False and ms["connectable"] is True
+
+
 def test_microsoft_365_needs_admin_setup_when_unconfigured(client, monkeypatch):
-    for name in ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT_ID"):
+    for name in ("MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"):
         monkeypatch.delenv(name, raising=False)
     ms = next(s for s in _ctx(client, login(client))["sources"] if s["kind"] == "microsoft365")
     assert ms["state"] == "available" and ms["setup_required"] is True and ms["connectable"] is False
@@ -136,13 +142,11 @@ def test_transcripts_turned_off_on_the_server_are_explained(client, session_fact
 def test_a_colleagues_microsoft_connection_is_never_shown(client, session_factory, m365):
     headers = entra_sign_in(client, session_factory, m365)
     connect_m365(client, session_factory, m365, headers)
-    with session_factory() as db:
-        org_id = db.scalar(select(User.org_id).where(User.email == "yamini@contoso.example"))
-        db.add(User(org_id=org_id, email="dana@contoso.example", name="Dana Ruiz", role="member"))
-        db.commit()
-    ms = next(s for s in _ctx(client, login(client, "dana@contoso.example"))["sources"] if s["kind"] == "microsoft365")
+    m365.oid, m365.email, m365.display_name = "oid-dana", "dana@contoso.example", "Dana Ruiz"  # same tenant
+    dana = entra_sign_in(client, session_factory, m365)
+    ms = next(s for s in _ctx(client, dana)["sources"] if s["kind"] == "microsoft365")
     assert ms["state"] == "available" and ms["connection"] is None
-    assert "yamini@contoso.example" not in str(_ctx(client, login(client, "dana@contoso.example")))
+    assert "yamini@contoso.example" not in str(_ctx(client, dana))
 
 
 def test_disconnected_source_reads_as_disconnected_and_stops_counting(client, session_factory, m365):

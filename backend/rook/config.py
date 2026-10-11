@@ -32,7 +32,7 @@ def _bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     database_url: str = field(default_factory=lambda: os.environ.get("ROOK_DATABASE_URL", "sqlite:///./rook.db"))
-    secret_key: str = field(default_factory=lambda: os.environ.get("ROOK_SECRET_KEY", "dev-only-change-me"))
+    secret_key: str = field(default_factory=lambda: os.environ.get("ROOK_SECRET_KEY", "dev-only-change-me"))  # see DEFAULT_SECRET_KEY
     dev_login: bool = field(default_factory=lambda: _bool("ROOK_DEV_LOGIN", True))
     cors_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(
@@ -74,5 +74,51 @@ def web_url() -> str:
     return env("ROOK_WEB_URL", "http://localhost:3000").rstrip("/")
 
 
+def environment() -> str:
+    """development | production. Anything other than "development" is treated as production (fail closed)."""
+    return "development" if env("ROOK_ENVIRONMENT", "development").lower() == "development" else "production"
+
+
+def is_development() -> bool:
+    return environment() == "development"
+
+
 def admin_emails() -> set[str]:
+    """Development convenience only: never decides who owns or administers a real organization (ADR-0011)."""
+    if not is_development():
+        return set()
     return {e.strip().lower() for e in env("ROOK_ADMIN_EMAILS").split(",") if e.strip()}
+
+
+def allowed_tenants() -> set[str]:
+    """Optional allow-list of Entra tenant ids that may sign in. Empty: any organizational tenant.
+
+    ``MICROSOFT_TENANT_ID`` (the single-tenant setting before ADR-0011) still restricts sign-in to that tenant, so an
+    existing deployment never silently opens up; set ``MICROSOFT_ALLOWED_TENANT_IDS`` instead.
+    """
+    raw = f"{env('MICROSOFT_ALLOWED_TENANT_IDS')},{env('MICROSOFT_TENANT_ID')}"
+    return {t.strip().lower() for t in raw.split(",") if t.strip()}
+
+
+DEFAULT_SECRET_KEY = "dev-only-change-me"
+
+
+class UnsafeConfiguration(RuntimeError):
+    pass
+
+
+def check_runtime_config() -> None:
+    """Refuse to start a production server with development-only settings."""
+    if is_development():
+        return
+    problems = []
+    if settings.dev_login:
+        problems.append("ROOK_DEV_LOGIN must be false (demo login is development-only)")
+    if not settings.secret_key or settings.secret_key == DEFAULT_SECRET_KEY or len(settings.secret_key) < 32:
+        problems.append("ROOK_SECRET_KEY must be set to a random value of at least 32 characters")
+    if not env("ROOK_ENCRYPTION_KEY"):
+        problems.append("ROOK_ENCRYPTION_KEY must be set")
+    if env("ROOK_ADMIN_EMAILS"):
+        problems.append("ROOK_ADMIN_EMAILS is development-only; organization ownership comes from first sign-in")
+    if problems:
+        raise UnsafeConfiguration("Unsafe production configuration: " + "; ".join(problems))

@@ -31,6 +31,17 @@ test("context control center with a Microsoft 365 permission gap", async ({ page
   await audit(page, "context: confirm disconnect");
 });
 
+test("organization setup", async ({ page }) => {
+  await signIn(page);
+  await page.route("**/api/me", async (route) => {
+    const real = await (await route.fetch()).json();
+    await route.fulfill({ json: { ...real, org: { ...real.org, status: "setup", is_demo: false, is_owner: true, setup_required: true } } });
+  });
+  await page.goto("/setup");
+  await expect(page.getByLabel("Organization name")).toBeVisible();
+  await audit(page, "setup");
+});
+
 test("all P0 workspace screens", async ({ page }) => {
   await signIn(page);
   await page.waitForLoadState("networkidle");
