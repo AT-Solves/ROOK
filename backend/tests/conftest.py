@@ -31,7 +31,8 @@ def session_factory():
     with factory() as db:
         # A zone where it is mid-morning right now: a realistic working day whenever the suite runs.
         ensure_demo_tenant(db, timezone=demo_morning_timezone(utcnow()))
-    return factory
+    yield factory
+    engine.dispose()  # close pooled connections: one engine per test would otherwise exhaust Postgres' max_connections
 
 
 @pytest.fixture()
