@@ -15,7 +15,7 @@ from ..config import settings, web_url
 from ..connectors import REGISTRY, ConnectorAuthError, ConnectorNotConfigured, SyncBatch, get_connector_class
 from ..connectors.base import NormalizedSignal
 from ..db import get_db
-from ..identity import IdentityError
+from ..identity import ConnectNotAllowed, IdentityError
 from ..identity import get_provider as get_identity_provider
 from ..identity import service as identity
 from ..models import (
@@ -70,7 +70,9 @@ def health():
 def login(body: LoginIn, db: Session = Depends(get_db)):
     if not settings.dev_login:
         raise HTTPException(403, "Dev login disabled; use SSO")
-    user = db.scalar(select(User).where(User.email == body.email.strip().lower()))
+    # Demo login only ever reaches the synthetic demo organization; it can never find a real-tenant user (ADR-0011).
+    user = db.scalar(select(User).join(Organization, Organization.id == User.org_id).where(
+        Organization.is_demo.is_(True), User.email == body.email.strip().lower()))
     if user is None:
         raise HTTPException(401, "Unknown user")
     audit.record(db, org_id=user.org_id, user_id=user.id, actor=f"user:{user.email}", action="auth.login",
@@ -118,7 +120,33 @@ def auth_callback(provider_id: str, code: str | None = None, state: str | None =
 @router.get("/me")
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     org = db.get(Organization, user.org_id)
-    return {"user": _user_dict(user), "org": {"id": org.id, "name": org.name}, "llm": provider_name()}
+    return {"user": _user_dict(user), "org": _org_dict(org, user), "llm": provider_name()}
+
+
+def _org_dict(org: Organization, user: User) -> dict:
+    return {"id": org.id, "name": org.name, "status": org.status, "is_demo": org.is_demo,
+            "identity_provider": org.identity_provider, "is_owner": org.created_by == user.id,
+            # Only an administrator completes setup; members go straight to the workspace.
+            "setup_required": org.status == "setup" and user.role == "admin"}
+
+
+class OrgSetupIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
+@router.post("/org/setup")
+def org_setup(body: OrgSetupIn, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """The first administrator confirms the organization; it is always the caller's own organization."""
+    org = db.get(Organization, user.org_id)
+    name = " ".join(body.name.split())
+    if not name:
+        raise HTTPException(422, "Enter your organization's name.")
+    org.name, org.status = name, "active"
+    org.setup_completed_at = org.setup_completed_at or utcnow()
+    audit.record(db, org_id=org.id, user_id=user.id, actor=f"user:{user.email}", action="org.setup_completed",
+                 authorization="organization administrator", result=name)
+    db.commit()
+    return _org_dict(org, user)
 
 
 class MeIn(BaseModel):
@@ -481,6 +509,8 @@ def connect_delegated(kind: str, user: User = Depends(current_user), db: Session
         raise HTTPException(404, "This source is not connected through OAuth")
     try:
         return {"authorization_url": identity.start(db, provider_id, "connect", user=user, return_to="/sources")}
+    except ConnectNotAllowed as exc:
+        raise HTTPException(409, str(exc)) from exc
     except IdentityError as exc:
         raise HTTPException(503, str(exc)) from exc
 

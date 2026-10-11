@@ -1,20 +1,41 @@
-"""Microsoft Entra ID (OIDC authorisation-code flow with PKCE, confidential client)."""
+"""Microsoft Entra ID, multi-tenant (ADR-0004, ADR-0011): OIDC authorization-code flow with PKCE, confidential client.
+
+Sign-in uses the ``organizations`` authority, so any work or school account can sign in and personal Microsoft
+accounts cannot. Connecting data and refreshing tokens use the user's own tenant authority. Every ID token is
+validated cryptographically against Microsoft's published signing keys (JWKS) and then by claim: audience, issuer
+for the token's tenant, tenant, expiry / not-before / issued-at, nonce and object id.
+"""
 
 from __future__ import annotations
 
-import base64
-import json
+import logging
+import re
+import threading
 import time
 from urllib.parse import urlencode
 
 import httpx
+import jwt
 
-from ..config import env
+from ..config import allowed_tenants, env
 from .base import IdentityClaims, IdentityError, IdentityProvider, TokenSet
 
+log = logging.getLogger(__name__)
 
-def _b64json(segment: str) -> dict:
-    return json.loads(base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4)))
+LOGIN_HOST = "https://login.microsoftonline.com"
+SIGNIN_AUTHORITY = "organizations"  # work and school accounts from any tenant; never personal accounts
+JWKS_URL = f"{LOGIN_HOST}/common/discovery/v2.0/keys"
+GRAPH = "https://graph.microsoft.com/v1.0"
+# The tenant that issues tokens for personal Microsoft accounts (outlook.com, hotmail.com, live.com).
+CONSUMER_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad"
+_GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+JWKS_TTL = 24 * 3600
+JWKS_MIN_REFRESH = 300  # an unknown key id may trigger at most one refetch per 5 minutes
+CLOCK_SKEW = 60
+
+
+def valid_tenant_id(value: str | None) -> bool:
+    return bool(value) and bool(_GUID.match(value)) and value != CONSUMER_TENANT
 
 
 class EntraIdProvider(IdentityProvider):
@@ -23,31 +44,36 @@ class EntraIdProvider(IdentityProvider):
 
     def __init__(self, transport: httpx.BaseTransport | None = None):
         self._transport = transport
+        self._keys: dict[str, object] = {}
+        self._keys_at = 0.0
+        self._lock = threading.Lock()
 
     @property
     def client_id(self) -> str:
         return env("MICROSOFT_CLIENT_ID")
 
-    @property
-    def tenant(self) -> str:
-        return env("MICROSOFT_TENANT_ID")
-
     def configured(self) -> bool:
-        return bool(self.client_id and env("MICROSOFT_CLIENT_SECRET") and self.tenant)
+        return bool(self.client_id and env("MICROSOFT_CLIENT_SECRET"))
 
-    def _authority(self) -> str:
-        return f"https://login.microsoftonline.com/{self.tenant}/oauth2/v2.0"
+    def _http(self) -> httpx.Client:
+        return httpx.Client(transport=self._transport, timeout=30)
 
-    def authorization_url(self, *, state, nonce, code_challenge, scopes, redirect_uri) -> str:
+    @staticmethod
+    def _authority(tenant: str | None) -> str:
+        if tenant is not None and not valid_tenant_id(tenant):
+            raise IdentityError("Invalid Microsoft tenant.")
+        return f"{LOGIN_HOST}/{tenant or SIGNIN_AUTHORITY}/oauth2/v2.0"
+
+    def authorization_url(self, *, state, nonce, code_challenge, scopes, redirect_uri, tenant=None) -> str:
         q = {"client_id": self.client_id, "response_type": "code", "redirect_uri": redirect_uri, "response_mode": "query",
              "scope": " ".join(scopes), "state": state, "nonce": nonce, "code_challenge": code_challenge,
              "code_challenge_method": "S256"}
-        return f"{self._authority()}/authorize?{urlencode(q)}"
+        return f"{self._authority(tenant)}/authorize?{urlencode(q)}"
 
-    def _token(self, data: dict) -> TokenSet:
+    def _token(self, data: dict, tenant: str | None) -> TokenSet:
         data = data | {"client_id": self.client_id, "client_secret": env("MICROSOFT_CLIENT_SECRET")}
         try:
-            r = httpx.Client(transport=self._transport, timeout=30).post(f"{self._authority()}/token", data=data)
+            r = self._http().post(f"{self._authority(tenant)}/token", data=data)
         except httpx.HTTPError as exc:
             raise IdentityError("Could not reach Microsoft sign-in. Try again shortly.") from exc
         body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
@@ -58,37 +84,121 @@ class EntraIdProvider(IdentityProvider):
                         expires_in=int(body.get("expires_in", 3600)), id_token=body.get("id_token", ""),
                         scope=body.get("scope", ""))
 
-    def exchange_code(self, *, code, code_verifier, redirect_uri, scopes) -> TokenSet:
+    def exchange_code(self, *, code, code_verifier, redirect_uri, scopes, tenant=None) -> TokenSet:
         return self._token({"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri,
-                            "code_verifier": code_verifier, "scope": " ".join(scopes)})
+                            "code_verifier": code_verifier, "scope": " ".join(scopes)}, tenant)
 
-    def refresh(self, *, refresh_token, scopes) -> TokenSet:
-        return self._token({"grant_type": "refresh_token", "refresh_token": refresh_token, "scope": " ".join(scopes)})
+    def refresh(self, *, refresh_token, scopes, tenant) -> TokenSet:
+        return self._token({"grant_type": "refresh_token", "refresh_token": refresh_token, "scope": " ".join(scopes)},
+                           tenant)
 
-    def validate_id_token(self, id_token: str, *, nonce: str) -> IdentityClaims:
-        """Claim validation for an ID token received directly from the token endpoint over TLS
-        (OIDC Core §3.1.3.7 permits TLS server validation in place of signature checks for this case)."""
+    # -- signing keys -------------------------------------------------------------------------
+    def _load_keys(self) -> None:
         try:
-            claims = _b64json(id_token.split(".")[1])
-        except (IndexError, ValueError) as exc:
+            r = self._http().get(JWKS_URL)
+            r.raise_for_status()
+            keys = r.json().get("keys", [])
+        except (httpx.HTTPError, ValueError) as exc:
+            raise IdentityError("Could not load Microsoft's signing keys. Try again shortly.") from exc
+        loaded = {}
+        for k in keys:
+            if k.get("kty") == "RSA" and k.get("kid") and k.get("use", "sig") == "sig":
+                try:
+                    loaded[k["kid"]] = jwt.PyJWK(k, algorithm="RS256").key
+                except jwt.PyJWKError:
+                    continue
+        if not loaded:
+            raise IdentityError("Microsoft returned no usable signing keys.")
+        self._keys, self._keys_at = loaded, time.time()
+
+    def _signing_key(self, kid: str):
+        with self._lock:
+            now = time.time()
+            if not self._keys or now - self._keys_at > JWKS_TTL:
+                self._load_keys()
+            elif kid not in self._keys and now - self._keys_at > JWKS_MIN_REFRESH:
+                self._load_keys()  # Microsoft rotates keys; refetch once for an unknown key id
+            key = self._keys.get(kid)
+        if key is None:
+            raise IdentityError("ID token rejected: unknown signing key")
+        return key
+
+    # -- ID token -----------------------------------------------------------------------------
+    def validate_id_token(self, id_token: str, *, nonce: str, expected_tenant: str | None = None) -> IdentityClaims:
+        try:
+            header = jwt.get_unverified_header(id_token)
+        except jwt.PyJWTError as exc:
             raise IdentityError("Malformed ID token") from exc
-        tid = claims.get("tid", "")
-        checks = [
-            (claims.get("aud") == self.client_id, "audience"),
-            (tid == self.tenant, "tenant (only the configured Microsoft tenant may sign in)"),
-            (claims.get("iss") == f"https://login.microsoftonline.com/{tid}/v2.0", "issuer"),
-            (int(claims.get("exp", 0)) > time.time() - 60, "expiry"),
-            (claims.get("nonce") == nonce, "nonce"),
-            (bool(claims.get("oid")), "subject"),
-        ]
-        for ok, what in checks:
-            if not ok:
-                raise IdentityError(f"ID token rejected: invalid {what}")
-        email = (claims.get("email") or claims.get("preferred_username") or "").lower()
+        if header.get("alg") != "RS256" or not header.get("kid"):
+            raise IdentityError("ID token rejected: unexpected signing algorithm")
+        try:
+            claims = jwt.decode(
+                id_token, self._signing_key(header["kid"]), algorithms=["RS256"], audience=self.client_id,
+                leeway=CLOCK_SKEW, options={"require": ["exp", "iat", "aud", "iss", "tid", "oid", "nonce"],
+                                            "verify_signature": True, "verify_aud": True, "verify_exp": True,
+                                            "verify_iat": True, "verify_nbf": True, "verify_iss": False})
+        except jwt.InvalidAudienceError as exc:
+            raise IdentityError("ID token rejected: invalid audience") from exc
+        except jwt.ExpiredSignatureError as exc:
+            raise IdentityError("ID token rejected: expired") from exc
+        except jwt.ImmatureSignatureError as exc:
+            raise IdentityError("ID token rejected: not yet valid") from exc
+        except jwt.InvalidSignatureError as exc:
+            raise IdentityError("ID token rejected: invalid signature") from exc
+        except jwt.PyJWTError as exc:
+            raise IdentityError("ID token rejected: invalid token") from exc
+        if claims.get("iat", 0) > time.time() + CLOCK_SKEW:
+            raise IdentityError("ID token rejected: issued in the future")
+
+        tid = str(claims["tid"]).lower()
+        if not valid_tenant_id(tid):
+            raise IdentityError("ID token rejected: invalid tenant (personal Microsoft accounts cannot sign in)")
+        # The issuer must be the token's own tenant (multi-tenant validation; the signature has been verified).
+        if claims.get("iss") != f"{LOGIN_HOST}/{tid}/v2.0":
+            raise IdentityError("ID token rejected: invalid issuer")
+        if expected_tenant is not None and tid != expected_tenant.lower():
+            raise IdentityError("ID token rejected: invalid tenant (the account belongs to another organization)")
+        allowed = allowed_tenants()
+        if allowed and tid not in allowed:
+            raise IdentityError("ID token rejected: invalid tenant (this organization is not enabled on this ROOK server)")
+        if claims.get("nonce") != nonce:
+            raise IdentityError("ID token rejected: invalid nonce")
+        if not claims.get("oid"):
+            raise IdentityError("ID token rejected: invalid subject")
+        # preferred_username is the sign-in name (unique in the tenant); the email claim can be edited and unverified.
+        email = (claims.get("preferred_username") or claims.get("email") or "").lower()
         if "@" not in email:
             raise IdentityError("Your Microsoft account has no email address ROOK can use.")
-        return IdentityClaims(provider=self.id, tenant=tid, subject=claims["oid"], email=email,
+        return IdentityClaims(provider=self.id, tenant=tid, subject=str(claims["oid"]), email=email,
                               name=claims.get("name") or email)
+
+    def directory_email(self, access_token: str) -> str | None:
+        """The primary SMTP address from the directory (Graph GET /me ``mail``, readable with User.Read).
+
+        Source systems list people by mailbox address, which can differ from the sign-in name (UPN); this is what
+        ROOK matches against source access lists. It is directory data, not a token claim the user can edit."""
+        try:
+            r = self._http().get(f"{GRAPH}/me", params={"$select": "mail"},
+                                 headers={"Authorization": f"Bearer {access_token}"})
+            if r.status_code == 200:
+                mail = (r.json().get("mail") or "").strip().lower()
+                return mail if "@" in mail else None
+        except (httpx.HTTPError, ValueError):
+            log.info("Could not read the user's directory email from Microsoft Graph")
+        return None
+
+    def organization_name(self, access_token: str) -> str | None:
+        """The tenant's display name (Graph GET /organization, readable with User.Read)."""
+        try:
+            r = self._http().get(f"{GRAPH}/organization", params={"$select": "displayName"},
+                                 headers={"Authorization": f"Bearer {access_token}"})
+            if r.status_code == 200:
+                value = r.json().get("value") or []
+                name = (value[0].get("displayName") or "").strip() if value else ""
+                return name[:200] or None
+        except (httpx.HTTPError, ValueError):
+            log.info("Could not read the organization name from Microsoft Graph")
+        return None
 
 
 _PROVIDERS: dict[str, IdentityProvider] = {}

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api.routes import router
 from .bootstrap import ensure_demo_tenant
-from .config import settings
+from .config import check_runtime_config, settings
 from .db import SessionLocal, init_db
 from .logging import configure as configure_logging
 from .logging import install_middleware
@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app(use_lifespan: bool = True) -> FastAPI:
+    check_runtime_config()  # production refuses development-only settings before serving anything
     app = FastAPI(title="ROOK API", version="0.1.0", description="Enterprise AI Chief of Staff — prototype",
                   lifespan=lifespan if use_lifespan else None)
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_credentials=True,

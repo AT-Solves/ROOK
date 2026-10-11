@@ -26,7 +26,7 @@ def ensure_demo_tenant(db: Session, sync: bool = True, timezone: str | None = No
     org = db.scalar(select(Organization).where(Organization.slug == "acme"))
     tz = timezone or os.environ.get("ROOK_DEMO_TIMEZONE") or "UTC"
     if org is None:
-        org = Organization(name="Acme Robotics", slug="acme", ai_policy=dict(DEFAULT_POLICY))
+        org = Organization(name="Acme Robotics", slug="acme", ai_policy=dict(DEFAULT_POLICY), is_demo=True)
         db.add(org)
         db.flush()
         db.add_all([
@@ -41,6 +41,9 @@ def ensure_demo_tenant(db: Session, sync: bool = True, timezone: str | None = No
         if sync:
             for c in org_connectors(db, org.id):
                 sync_connector(db, c, actor="system:bootstrap")
+    elif not org.is_demo:  # databases created before ADR-0011
+        org.is_demo = True
+        db.commit()
     return org
 
 

@@ -7,31 +7,48 @@ API release is delayed; an upcoming Phoenix review is on the calendar.
 
 from __future__ import annotations
 
-import base64
 import json
 import time
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs
 
 import httpx
+import jwt
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 TENANT = "11111111-2222-3333-4444-555555555555"
+OTHER_TENANT = "22222222-3333-4444-5555-666666666666"
 CLIENT_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 ME = "yamini@contoso.example"
+KID = "test-signing-key"
+
+# Microsoft's signing key, as far as these tests are concerned; ATTACKER_KEY is one Microsoft never published.
+SIGNING_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+ATTACKER_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+
+def jwks() -> dict:
+    jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(SIGNING_KEY.public_key()))
+    return {"keys": [jwk | {"kid": KID, "use": "sig", "alg": "RS256"}]}
+
+
+def sign(claims: dict, *, key=None, kid: str = KID, alg: str = "RS256") -> str:
+    return jwt.encode(claims, key or SIGNING_KEY, algorithm=alg, headers={"kid": kid})
+
+
+def id_claims(nonce: str, *, tid: str = TENANT, oid: str = "oid-yamini", email: str = ME, aud: str = CLIENT_ID,
+              name: str = "Yamini Devasena") -> dict:
+    now = int(time.time())
+    return {"aud": aud, "tid": tid, "iss": f"https://login.microsoftonline.com/{tid}/v2.0", "iat": now, "nbf": now,
+            "exp": now + 3600, "nonce": nonce, "oid": oid, "preferred_username": email, "name": name, "ver": "2.0"}
 
 
 def _iso(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S.0000000")
 
 
-def _b64(d: dict) -> str:
-    return base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b"=").decode()
-
-
-def id_token(nonce: str, *, tid: str = TENANT, oid: str = "oid-yamini", email: str = ME, aud: str = CLIENT_ID) -> str:
-    claims = {"aud": aud, "tid": tid, "iss": f"https://login.microsoftonline.com/{tid}/v2.0", "exp": int(time.time()) + 3600,
-              "nonce": nonce, "oid": oid, "preferred_username": email, "name": "Yamini Devasena"}
-    return f"{_b64({'alg': 'RS256'})}.{_b64(claims)}.sig"
+def id_token(nonce: str, **kw) -> str:
+    return sign(id_claims(nonce, **kw))
 
 
 def _addr(name: str, email: str) -> dict:
@@ -42,7 +59,15 @@ class FakeM365:
     def __init__(self, now: datetime | None = None):
         self.now = now or datetime.now(UTC).replace(tzinfo=None)
         self.nonce = ""
+        # Who signs in next: tenant, object id, sign-in name. Tests change these to act as other identities.
         self.tid = TENANT
+        self.oid = "oid-yamini"
+        self.email = ME
+        self.display_name = "Yamini Devasena"
+        self.mail = None  # directory mailbox address (Graph /me mail); None means "same as the sign-in name"
+        self.org_names = {TENANT: "Contoso", OTHER_TENANT: "Fabrikam"}
+        self.tamper = None  # optional callable(claims) -> id_token, to issue forged or malformed tokens
+        self.authorities: list[str] = []  # tenant segment of every token request (organizations | <tenant id>)
         self.sent: list[dict] = []
         self.graph_calls: list[str] = []
         self.throttle_once = False
@@ -51,14 +76,19 @@ class FakeM365:
 
     # -- Entra ID ------------------------------------------------------------------------
     def _token(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/common/discovery/v2.0/keys":
+            return httpx.Response(200, json=jwks())
+        self.authorities.append(request.url.path.split("/")[1])
         form = parse_qs(request.content.decode())
         if form.get("grant_type") == ["refresh_token"]:
             self.refreshes += 1
             return httpx.Response(200, json={"access_token": "at-refreshed", "refresh_token": "rt-2", "expires_in": 3600})
         if form.get("code") != ["good-code"]:
             return httpx.Response(400, json={"error": "invalid_grant"})
-        return httpx.Response(200, json={"access_token": "at-1", "refresh_token": "rt-1", "expires_in": 3600,
-                                         "scope": form.get("scope", [""])[0], "id_token": id_token(self.nonce, tid=self.tid)})
+        claims = id_claims(self.nonce, tid=self.tid, oid=self.oid, email=self.email, name=self.display_name)
+        token = self.tamper(claims) if self.tamper else sign(claims)
+        return httpx.Response(200, json={"access_token": f"at-{self.tid}", "refresh_token": "rt-1", "expires_in": 3600,
+                                         "scope": form.get("scope", [""])[0], "id_token": token})
 
     # -- Graph ---------------------------------------------------------------------------
     def messages(self) -> list[dict]:
@@ -126,6 +156,11 @@ class FakeM365:
         assert url.host == "graph.microsoft.com", url
         path = url.path.removeprefix("/v1.0")
         self.graph_calls.append(path)
+        if path == "/me" and url.params.get("$select") == "mail":
+            return httpx.Response(200, json={"mail": self.mail if self.mail is not None else self.email})
+        if path == "/organization":
+            tid = request.headers.get("Authorization", "").removeprefix("Bearer at-")
+            return httpx.Response(200, json={"value": [{"displayName": self.org_names.get(tid, "")}]})
         if self.throttle_once:
             self.throttle_once = False
             return httpx.Response(429, headers={"Retry-After": "0"})
