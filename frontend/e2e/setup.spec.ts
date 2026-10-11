@@ -34,6 +34,8 @@ test("the first administrator of a new organization is guided through setup", as
   await expect(page.getByRole("heading", { name: /Fabrikam Ltd is ready/ })).toBeVisible();
   await page.getByRole("button", { name: "Skip for now" }).click();
   await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible(); // the workspace has loaded
+  await page.unrouteAll({ behavior: "ignoreErrors" }); // don't let an in-flight mocked request outlive the test
 });
 
 test("existing organizations go straight to the workspace", async ({ page }) => {
