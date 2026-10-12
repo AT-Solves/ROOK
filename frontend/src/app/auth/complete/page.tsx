@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { RookMark } from "@/components/rook";
 import { safeReturnTo, setToken } from "@/lib/session";
@@ -9,7 +9,12 @@ import { safeReturnTo, setToken } from "@/lib/session";
 /** Landing page after Microsoft sign-in. The session token arrives in the URL fragment (never sent to servers). */
 export default function AuthComplete() {
   const router = useRouter();
+  // The fragment is read once and then cleared. React development mode runs effects twice; without this guard the
+  // second run would find no token and report a failed sign-in after the first run had already completed it.
+  const handled = useRef(false);
   useEffect(() => {
+    if (handled.current) return;
+    handled.current = true;
     const frag = new URLSearchParams(window.location.hash.slice(1));
     const token = frag.get("token");
     history.replaceState(null, "", window.location.pathname); // drop the token from the address bar and history
