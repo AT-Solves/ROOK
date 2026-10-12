@@ -29,7 +29,7 @@ export function SourceLine({ e }: { e: EvidenceRef }) {
       e={e}
       href={`/evidence/${e.signal_id}`}
       title={e.title}
-      meta={`${e.channel} · ${e.author} · ${formatDateTime(e.occurred_at)}${e.note ? ` · ${e.note}` : ""}`}
+      meta={`${e.author && e.author !== e.channel ? `${e.channel} · ${e.author}` : e.channel} · ${formatDateTime(e.occurred_at)}${e.note ? ` · ${e.note}` : ""}`}
       quote={e.quote || undefined}
     />
   );

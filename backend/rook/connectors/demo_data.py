@@ -218,7 +218,7 @@ def build(now: datetime, tz: str = "UTC") -> SyncBatch:
         "jira-1842", "task_update", "Jira", "PROJ-1842 · Phoenix performance test environment",
         "Status changed In Progress → Blocked. Phoenix performance testing is 2 days behind schedule; "
         "load environment waiting on API release.",
-        "Jira", "", ago(1, 18), [], authority=0.9, url="https://jira.acme.example/browse/PROJ-1842",
+        "Jira", "", ago(1, 18), [], authority=0.9,  # synthetic: no original to open (the old URL could never resolve)
     ))
     add(NormalizedSignal(
         "em-pricing", "email", "Gmail", "Phoenix pricing — decision needed",
