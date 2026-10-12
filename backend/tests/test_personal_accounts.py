@@ -295,3 +295,63 @@ def test_work_sign_in_finds_an_organization_not_yet_backfilled(client, session_f
     assert again["org"]["id"] == first["org"]["id"] and again["user"]["id"] == first["user"]["id"]
     with session_factory() as db:
         assert db.get(Organization, first["org"]["id"]).external_key == f"microsoft:tenant:{TENANT}"
+
+
+# ---------------------------------------------------------------- review follow-ups
+def test_personal_key_outage_never_blocks_work_sign_in(personal_on, m365, provider):
+    m365.consumers_keys_down = True
+    assert not provider.validate_id_token(sign(id_claims(NONCE)), nonce=NONCE).personal  # work sign-in still works
+    with pytest.raises(IdentityError, match="unknown signing key"):  # personal tokens fail closed
+        provider.validate_id_token(sign_personal(_personal()), nonce=NONCE)
+    m365.consumers_keys_down = False
+    provider._keys_at = 0  # the next unknown key id refetches once Microsoft is back
+    assert provider.validate_id_token(sign_personal(_personal()), nonce=NONCE).personal
+
+
+def test_work_key_outage_still_fails_closed(personal_on, m365, provider, monkeypatch):
+    monkeypatch.setattr(m365, "_token", lambda request: __import__("httpx").Response(503))
+    with pytest.raises(IdentityError, match="signing keys"):
+        provider.validate_id_token(sign(id_claims(NONCE)), nonce=NONCE)
+
+
+def _m365_source(client, h):
+    ctx = client.get("/api/context", headers=h).json()
+    return next(s for s in ctx["sources"] if s["kind"] == "microsoft365")
+
+
+def test_personal_context_shows_only_what_rook_asks_for(personal_on, client, session_factory, m365, monkeypatch):
+    monkeypatch.setenv("MICROSOFT_ENABLE_SEND", "true")
+    as_personal(m365)
+    h = entra_sign_in(client, session_factory, m365)
+    src = _m365_source(client, h)
+    assert {p["scope"] for p in src["requested_permissions"]} == {"offline_access", "User.Read", "Mail.Read",
+                                                                  "Calendars.Read"}
+    assert "teams_transcripts" not in {d["key"] for d in src["data_types"]}
+    assert src["sending"] == "off"
+    catalog = next(s for s in client.get("/api/sources", headers=h).json() if s["kind"] == "microsoft365")
+    assert set(catalog["scopes"]) == {"offline_access", "User.Read", "Mail.Read", "Calendars.Read"}
+    assert catalog["sending_enabled"] is False
+
+
+def test_work_context_still_shows_teams_and_sending(personal_on, client, session_factory, m365, monkeypatch):
+    monkeypatch.setenv("MICROSOFT_ENABLE_SEND", "true")
+    src = _m365_source(client, entra_sign_in(client, session_factory, m365))
+    assert {"OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"} <= {p["scope"] for p in src["requested_permissions"]}
+    assert "teams_transcripts" in {d["key"] for d in src["data_types"]}
+    assert src["sending"].startswith("enabled")
+
+
+def test_personal_workspace_never_sends_even_when_sending_is_enabled(personal_on, client, session_factory, m365,
+                                                                      monkeypatch):
+    monkeypatch.setenv("MICROSOFT_ENABLE_SEND", "true")
+    h, _ = _connect_personal(client, session_factory, m365)
+    client.patch("/api/me", json={"timezone": "UTC"}, headers=h)
+    assert client.post("/api/projects", json={"name": "Project Phoenix", "aliases": ["phoenix"]}, headers=h).status_code == 200
+    cid = connect_m365(client, session_factory, m365, h)
+    client.post(f"/api/sources/{cid}/sync", headers=h)
+    commitment = next(c for c in client.get("/api/commitments", headers=h).json() if "performance testing" in c["description"])
+    draft = client.post(f"/api/commitments/{commitment['id']}/followup", json={}, headers=h).json()
+    assert draft["payload"]["to"]  # a real recipient, so only the sender rule can stop it
+    done = client.post(f"/api/actions/{draft['id']}/approve", headers=h).json()
+    assert done["status"] == "approved" and "No connected source is allowed to send" in done["result"]
+    assert m365.sent == []

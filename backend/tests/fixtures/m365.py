@@ -90,12 +90,15 @@ class FakeM365:
         self.transcripts_forbidden = False
         self.refreshes = 0
         self.revoked = False  # the user revoked ROOK's access in Microsoft 365: Graph answers 401
+        self.consumers_keys_down = False  # the personal-accounts key endpoint fails
 
     # -- Entra ID ------------------------------------------------------------------------
     def _token(self, request: httpx.Request) -> httpx.Response:
         if request.url.path == "/common/discovery/v2.0/keys":
             return httpx.Response(200, json=jwks())
         if request.url.path == "/consumers/discovery/v2.0/keys":
+            if self.consumers_keys_down:
+                return httpx.Response(503)
             return httpx.Response(200, json=personal_jwks())
         self.authorities.append(request.url.path.split("/")[1])
         form = parse_qs(request.content.decode())

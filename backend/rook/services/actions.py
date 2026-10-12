@@ -103,8 +103,10 @@ def approve(db: Session, user: User, proposal: ActionProposal) -> ActionProposal
 
     proposal.status = "approved"
     # Send only through a connector that belongs to the approving user (their own mailbox) and allows sending.
+    org = db.get(Organization, user.org_id)
+    personal = bool(org and org.account_type == "personal")  # personal Microsoft accounts never send (ADR-0012)
     sender = next((c for c in db.scalars(select(Connector).where(Connector.org_id == user.org_id)).all()
-                   if c.status == "connected" and get_connector_class(c.kind).sending_enabled()
+                   if c.status == "connected" and get_connector_class(c.kind).sends_for(personal)
                    and (c.created_by in (None, user.id) if c.kind == "demo" else c.created_by == user.id)), None)
     p = proposal.payload
     if not p.get("to"):

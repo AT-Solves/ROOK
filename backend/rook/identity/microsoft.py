@@ -126,7 +126,16 @@ class EntraIdProvider(IdentityProvider):
             sets["consumers"] = PERSONAL_JWKS_URL
         loaded: dict[str, tuple[object, frozenset[str]]] = {}
         for name, url in sets.items():
-            for k in self._fetch_keys(url):
+            try:
+                keys = self._fetch_keys(url)
+            except IdentityError:
+                if name == "common":
+                    raise
+                # The personal-accounts keys are optional: without them personal tokens are rejected (unknown key),
+                # but work and school sign-in keeps working.
+                log.warning("Could not load the personal-accounts signing keys; personal sign-in is unavailable.")
+                continue
+            for k in keys:
                 if k.get("kty") == "RSA" and k.get("kid") and k.get("use", "sig") == "sig":
                     try:
                         key = jwt.PyJWK(k, algorithm="RS256").key

@@ -468,13 +468,15 @@ def signal(sid: int, user: User = Depends(current_user), db: Session = Depends(g
 def sources(user: User = Depends(current_user), db: Session = Depends(get_db)):
     rows = db.scalars(select(Connector).where(Connector.org_id == user.org_id)).all()
     catalog = []
+    org = db.get(Organization, user.org_id)
+    personal = bool(org and org.account_type == "personal")
     for kind, cls in REGISTRY.items():
         # Delegated connectors are per user: show the caller's own connection only.
         c = next((r for r in rows if r.kind == kind and (not cls.delegated or r.created_by == user.id)), None)
         catalog.append({
             "kind": kind, "name": cls.display_name, "category": cls.category, "phase": cls.phase,
             "delegated": cls.delegated, "credentials_present": cls.is_configured(), "required_env": list(cls.required_env),
-            "scopes": list(cls.scopes), "sending_enabled": cls.sending_enabled(),
+            "scopes": list(cls.scopes_for(personal)), "sending_enabled": cls.sends_for(personal),
             "connection": {"id": c.id, "status": c.status, "last_synced_at": iso(c.last_synced_at)} if c else None,
         })
     return sorted(catalog, key=lambda x: (x["phase"], x["name"]))

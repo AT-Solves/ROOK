@@ -62,6 +62,14 @@ class Microsoft365Connector(BaseConnector):
         return env_bool("MICROSOFT_ENABLE_SEND", False)
 
     @classmethod
+    def scopes_for(cls, personal: bool = False) -> tuple[str, ...]:
+        return PERSONAL_DATA_SCOPES if personal else cls.scopes
+
+    @classmethod
+    def sends_for(cls, personal: bool = False) -> bool:
+        return not personal and cls.sending_enabled()  # Mail.Send is never requested for a personal account
+
+    @classmethod
     def requested_scopes(cls, personal: bool = False) -> list[str]:
         """Delegated permissions to request; decided by the server from the validated account type."""
         if personal:
@@ -134,6 +142,8 @@ class Microsoft365Connector(BaseConnector):
     def send(self, message: OutboundMessage) -> str:
         if not self.sending_enabled():
             raise ConnectorNotConfigured("Sending through Microsoft 365 is disabled (MICROSOFT_ENABLE_SEND=false).")
+        if self.context.personal_account:
+            raise ConnectorNotConfigured("Sending is not available for personal Microsoft accounts.")
         self._client().post("/me/sendMail", {
             "message": {"subject": message.subject, "body": {"contentType": "Text", "content": message.body},
                         "toRecipients": [{"emailAddress": {"address": a}} for a in message.to]},

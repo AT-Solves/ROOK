@@ -145,6 +145,8 @@ def _connection(db: Session, user: User, conn: Connector, cls) -> dict:
 
 def sources(db: Session, user: User) -> list[dict]:
     rows = db.scalars(select(Connector).where(Connector.org_id == user.org_id)).all()
+    org = db.get(Organization, user.org_id)
+    personal = bool(org and org.account_type == "personal")  # only what a personal account can use (ADR-0012)
     out = []
     for kind, cls in REGISTRY.items():
         # Delegated connectors are per user: show only the caller's own connection, never a colleague's account.
@@ -162,9 +164,10 @@ def sources(db: Session, user: User) -> list[dict]:
             "delegated": cls.delegated,
             "connectable": cls.implemented and cls.delegated and cls.is_configured() and not connected,
             "setup_required": cls.implemented and cls.delegated and not cls.is_configured(),
-            "data_types": [{"key": d.key, "type": d.context, "label": d.label} for d in cls.data_types],
-            "requested_permissions": [{"scope": s, "label": SCOPE_LABELS.get(s, s)} for s in cls.scopes],
-            "sending": "enabled — only messages you approve" if cls.sending_enabled() and cls.can_send else "off",
+            "data_types": [{"key": d.key, "type": d.context, "label": d.label} for d in cls.data_types
+                           if d.personal or not personal],
+            "requested_permissions": [{"scope": s, "label": SCOPE_LABELS.get(s, s)} for s in cls.scopes_for(personal)],
+            "sending": "enabled — only messages you approve" if cls.sends_for(personal) and cls.can_send else "off",
             "state": "connected" if connected else ("available" if cls.implemented else "later"),
             "connection": _connection(db, user, conn, cls) if conn is not None else None,
         })

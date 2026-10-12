@@ -30,6 +30,12 @@
   No `OnlineMeetings.*`, no transcripts, no `Mail.Send`, no Application permissions. The connector never calls Teams
   APIs for a personal account and reports transcripts as "Not available for personal Microsoft accounts." through the
   existing access-gap mechanism.
+- **What users see matches what ROOK asks for:** for a personal workspace, Context and Sources list only the scopes above
+  and no Teams data type, and sending shows as off. A personal workspace never sends, even if a server sets
+  `MICROSOFT_ENABLE_SEND=true`.
+- **Key availability:** the personal-accounts key set is optional. If Microsoft's `consumers` key endpoint fails,
+  personal tokens are rejected (unknown key) but work and school sign-in keeps working; a failure of the `common`
+  key set still blocks sign-in, as before.
 - **Migration:** additive (`ALTER TABLE … ADD COLUMN`, unique index), with an idempotent backfill of `external_key` for
   existing work organizations. Nothing is dropped or rewritten.
 

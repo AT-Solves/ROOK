@@ -139,6 +139,16 @@ class BaseConnector(ABC):
         return cls.can_send
 
     @classmethod
+    def scopes_for(cls, personal: bool = False) -> tuple[str, ...]:
+        """The delegated permissions this source asks for; ``personal``: for a personal Microsoft account (ADR-0012)."""
+        return cls.scopes
+
+    @classmethod
+    def sends_for(cls, personal: bool = False) -> bool:
+        """Whether this source may send approved messages for this kind of account."""
+        return cls.sending_enabled()
+
+    @classmethod
     def is_configured(cls) -> bool:
         import os
 
