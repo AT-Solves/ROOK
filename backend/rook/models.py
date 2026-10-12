@@ -259,7 +259,7 @@ class AuthState(Base):
     nonce: Mapped[str] = mapped_column(String(100))
     code_verifier: Mapped[str] = mapped_column(String(200))
     provider: Mapped[str] = mapped_column(String(40))
-    purpose: Mapped[str] = mapped_column(String(20))  # signin | connect
+    purpose: Mapped[str] = mapped_column(String(20))  # signin | signin_personal | connect
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     return_to: Mapped[str] = mapped_column(String(300), default="/")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

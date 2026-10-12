@@ -82,7 +82,19 @@ export default function LoginPage() {
                     : <>Your organization&apos;s workspace is chosen by your Microsoft account. ROOK uses only information your
                   organization and your permissions allow it to access.</>}
                 </p>
-                {ms?.configured ? (
+                {ms?.configured && ms.personal_accounts ? (
+                  <>
+                    {/* The kind of account is chosen here and bound to the sign-in on the server (ADR-0012). */}
+                    <a className={`${ROOK_BUTTON.primary} mt-5 w-full py-3 text-[14px]`} href={`${API_BASE}${ms.login_url}?account=work&return_to=${encodeURIComponent(returnTo)}`}>
+                      <RookMark tone="gold" size={18} />
+                      <span>Continue with work or school account</span>
+                    </a>
+                    <a className={`${ROOK_BUTTON.secondary} mt-2.5 w-full py-3 text-[14px]`} href={`${API_BASE}${ms.login_url}?account=personal&return_to=${encodeURIComponent(returnTo)}`}>
+                      <RookMark tone="midnight" size={18} />
+                      <span>Continue with personal Microsoft account</span>
+                    </a>
+                  </>
+                ) : ms?.configured ? (
                   <a className={`${ROOK_BUTTON.primary} mt-5 w-full py-3 text-[14px]`} href={`${API_BASE}${ms.login_url}?return_to=${encodeURIComponent(returnTo)}`}>
                     <RookMark tone="gold" size={18} />
                     <span>Continue with Microsoft</span>

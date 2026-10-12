@@ -15,7 +15,7 @@ from sqlalchemy.pool import StaticPool
 from rook.db import init_db
 from rook.identity import IdentityError
 from rook.identity.microsoft import EntraIdProvider
-from rook.models import Connector, ConnectorCredential, Organization, Signal, User
+from rook.models import AuthState, Connector, ConnectorCredential, Organization, Signal, User
 from tests.conftest import _complete_oauth, connect_m365, entra_sign_in
 from tests.fixtures.m365 import (
     ATTACKER_KEY,
@@ -49,6 +49,12 @@ def _personal(**kw) -> dict:
     return id_claims(NONCE, tid=CONSUMER_TENANT, oid="oid-ana", email="ana@outlook.example", **kw)
 
 
+def sign_in(client, session_factory, m365) -> dict:
+    """Sign in with the account choice that matches the identity the fake Microsoft returns."""
+    return entra_sign_in(client, session_factory, m365,
+                         account="personal" if m365.tid == CONSUMER_TENANT else "work")
+
+
 def _me(client, headers):
     return client.get("/api/me", headers=headers).json()
 
@@ -76,8 +82,82 @@ def test_personal_token_accepted_when_enabled(personal_on, client, provider):
     c = provider.validate_id_token(sign_personal(_personal()), nonce=NONCE)
     assert c.personal is True and c.tenant == CONSUMER_TENANT and c.subject == "oid-ana"
     assert client.get("/api/auth/providers").json()["providers"][0]["personal_accounts"] is True
-    loc = client.get("/api/auth/microsoft/login", follow_redirects=False).headers["location"]
-    assert loc.startswith("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?")
+
+
+# ---------------------------------------------------------------- explicit account choice (ADR-0012)
+def _login(client, account=None):
+    q = f"?account={account}" if account else ""
+    return client.get(f"/api/auth/microsoft/login{q}", follow_redirects=False)
+
+
+def _purpose(session_factory, url):
+    state = parse_qs(urlparse(url).query)["state"][0]
+    with session_factory() as db:
+        return db.scalar(select(AuthState.purpose).where(AuthState.state == state))
+
+
+def test_personal_choice_uses_consumers(personal_on, client, session_factory, m365):
+    url = _login(client, "personal").headers["location"]
+    assert url.startswith("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?")
+    assert set(parse_qs(urlparse(url).query)["scope"][0].split()) == {"openid", "profile", "email", "User.Read"}
+    assert _purpose(session_factory, url) == "signin_personal"  # the choice is stored server-side with the state
+
+
+@pytest.mark.parametrize("account", [None, "work"])
+def test_work_choice_uses_organizations(personal_on, client, session_factory, m365, account):
+    url = _login(client, account).headers["location"]
+    assert url.startswith("https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?")
+    assert _purpose(session_factory, url) == "signin"
+
+
+def test_unknown_account_choice_is_refused(personal_on, client, m365):
+    assert _login(client, "admin").status_code == 422
+
+
+def test_personal_choice_with_personal_identity_is_accepted(personal_on, client, session_factory, m365):
+    as_personal(m365)
+    me = _me(client, entra_sign_in(client, session_factory, m365, account="personal"))
+    assert me["org"]["account_type"] == "personal"
+    assert m365.authorities[-1] == "consumers"  # the code is exchanged at the authority it was issued by
+
+
+def test_personal_choice_with_work_identity_is_rejected(personal_on, client, session_factory, m365):
+    with session_factory() as db:
+        users_before = db.query(User).count()
+    url = _login(client, "personal").headers["location"]  # m365 returns a work identity
+    loc = _complete_oauth(client, session_factory, m365, url).headers["location"]
+    assert "/login?error=" in loc
+    with session_factory() as db:
+        assert db.query(User).count() == users_before and db.query(Organization).filter_by(tenant_id=TENANT).count() == 0
+
+
+def test_work_choice_with_personal_identity_is_rejected(personal_on, client, session_factory, m365):
+    as_personal(m365)
+    url = _login(client, "work").headers["location"]
+    loc = _complete_oauth(client, session_factory, m365, url).headers["location"]
+    assert "/login?error=" in loc and "personal%20Microsoft%20account" in loc
+    with session_factory() as db:
+        assert db.query(Organization).filter_by(account_type="personal").count() == 0
+
+
+def test_browser_cannot_change_the_choice_at_the_callback(personal_on, client, session_factory, m365):
+    as_personal(m365)
+    url = _login(client, "work").headers["location"]
+    state = parse_qs(urlparse(url).query)["state"][0]
+    with session_factory() as db:
+        m365.nonce = db.query(AuthState).filter_by(state=state).one().nonce
+    loc = client.get(f"/api/auth/microsoft/callback?code=good-code&state={state}&account=personal",
+                     follow_redirects=False).headers["location"]
+    assert "/login?error=" in loc
+    with session_factory() as db:
+        assert db.query(Organization).filter_by(account_type="personal").count() == 0
+
+
+def test_personal_choice_refused_when_disabled(client, session_factory, m365):
+    r = _login(client, "personal")
+    assert r.status_code == 503 and "not enabled" in r.json()["detail"]
+    with session_factory() as db:
+        assert db.query(AuthState).count() == 0
 
 
 @pytest.mark.parametrize("case, make, reason", [
@@ -110,9 +190,9 @@ def test_work_allow_list_still_enforced_and_does_not_govern_personal_accounts(pe
 # ---------------------------------------------------------------- workspaces
 def test_each_personal_account_gets_its_own_private_workspace(personal_on, client, session_factory, m365):
     as_personal(m365)
-    a = _me(client, entra_sign_in(client, session_factory, m365))
+    a = _me(client, sign_in(client, session_factory, m365))
     as_personal(m365, oid="oid-ben", email="ben@hotmail.example", name="Ben Okoro")
-    b = _me(client, entra_sign_in(client, session_factory, m365))
+    b = _me(client, sign_in(client, session_factory, m365))
     assert a["org"]["id"] != b["org"]["id"]
     for me, name in ((a, "Ana's workspace"), (b, "Ben's workspace")):
         assert me["org"]["account_type"] == "personal" and me["org"]["name"] == name
@@ -127,18 +207,18 @@ def test_each_personal_account_gets_its_own_private_workspace(personal_on, clien
 
 def test_another_personal_account_never_joins_a_personal_workspace(personal_on, client, session_factory, m365):
     as_personal(m365)
-    a = _me(client, entra_sign_in(client, session_factory, m365))
+    a = _me(client, sign_in(client, session_factory, m365))
     as_personal(m365, oid="oid-other", email="ana@outlook.example", name="Ana Silva")  # same email and name
-    b = _me(client, entra_sign_in(client, session_factory, m365))
+    b = _me(client, sign_in(client, session_factory, m365))
     assert a["org"]["id"] != b["org"]["id"] and a["user"]["id"] != b["user"]["id"]
     with session_factory() as db:
         assert db.query(User).filter_by(org_id=a["org"]["id"]).count() == 1
 
 
 def test_same_email_as_work_and_personal_identity_stays_separate(personal_on, client, session_factory, m365):
-    work = _me(client, entra_sign_in(client, session_factory, m365))
+    work = _me(client, sign_in(client, session_factory, m365))
     as_personal(m365, oid="oid-yamini-personal", email=ME, name="Yamini Devasena")
-    personal = _me(client, entra_sign_in(client, session_factory, m365))
+    personal = _me(client, sign_in(client, session_factory, m365))
     assert work["user"]["email"] == personal["user"]["email"] == ME
     assert work["user"]["id"] != personal["user"]["id"] and work["org"]["id"] != personal["org"]["id"]
     assert work["org"]["account_type"] == "organization" and personal["org"]["account_type"] == "personal"
@@ -146,15 +226,15 @@ def test_same_email_as_work_and_personal_identity_stays_separate(personal_on, cl
 
 def test_changed_email_keeps_the_personal_identity(personal_on, client, session_factory, m365):
     as_personal(m365)
-    first = _me(client, entra_sign_in(client, session_factory, m365))
+    first = _me(client, sign_in(client, session_factory, m365))
     as_personal(m365, email="ana.silva@outlook.example")
-    again = _me(client, entra_sign_in(client, session_factory, m365))
+    again = _me(client, sign_in(client, session_factory, m365))
     assert again["user"]["id"] == first["user"]["id"] and again["user"]["email"] == "ana.silva@outlook.example"
 
 
 def test_owner_completes_personal_setup(personal_on, client, session_factory, m365):
     as_personal(m365)
-    h = entra_sign_in(client, session_factory, m365)
+    h = sign_in(client, session_factory, m365)
     r = client.post("/api/org/setup", json={"name": "Ana's ROOK"}, headers=h)
     assert r.status_code == 200 and r.json()["status"] == "active" and r.json()["account_type"] == "personal"
 
@@ -162,7 +242,7 @@ def test_owner_completes_personal_setup(personal_on, client, session_factory, m3
 # ---------------------------------------------------------------- connecting Microsoft 365
 def _connect_personal(client, session_factory, m365):
     as_personal(m365)
-    h = entra_sign_in(client, session_factory, m365)
+    h = sign_in(client, session_factory, m365)
     url = client.post("/api/sources/microsoft365/connect", headers=h).json()["authorization_url"]
     return h, url
 
@@ -241,7 +321,7 @@ def test_personal_account_cannot_reach_another_personal_workspace(personal_on, c
     cid_a = connect_m365(client, session_factory, m365, h_a)
     client.post(f"/api/sources/{cid_a}/sync", headers=h_a)
     as_personal(m365, oid="oid-ben", email="ben@hotmail.example", name="Ben Okoro")
-    h_b = entra_sign_in(client, session_factory, m365)
+    h_b = sign_in(client, session_factory, m365)
     with session_factory() as db:
         sig_a = db.scalar(select(Signal.id).where(Signal.connector_id == cid_a))
     assert client.get(f"/api/signals/{sig_a}", headers=h_b).status_code == 404
@@ -256,7 +336,7 @@ def test_personal_account_cannot_reach_another_personal_workspace(personal_on, c
 def test_disabling_personal_accounts_blocks_existing_personal_sign_in(client, session_factory, m365, monkeypatch):
     monkeypatch.setenv("MICROSOFT_ALLOW_PERSONAL_ACCOUNTS", "true")
     as_personal(m365)
-    entra_sign_in(client, session_factory, m365)
+    sign_in(client, session_factory, m365)
     monkeypatch.setenv("MICROSOFT_ALLOW_PERSONAL_ACCOUNTS", "false")
     url = client.get("/api/auth/microsoft/login", follow_redirects=False).headers["location"]
     assert "/login?error=" in _complete_oauth(client, session_factory, m365, url).headers["location"]
@@ -287,11 +367,11 @@ def test_upgrade_backfills_external_keys_idempotently():
 
 
 def test_work_sign_in_finds_an_organization_not_yet_backfilled(client, session_factory, m365):
-    first = _me(client, entra_sign_in(client, session_factory, m365))
+    first = _me(client, sign_in(client, session_factory, m365))
     with session_factory() as db:
         db.get(Organization, first["org"]["id"]).external_key = None
         db.commit()
-    again = _me(client, entra_sign_in(client, session_factory, m365))
+    again = _me(client, sign_in(client, session_factory, m365))
     assert again["org"]["id"] == first["org"]["id"] and again["user"]["id"] == first["user"]["id"]
     with session_factory() as db:
         assert db.get(Organization, first["org"]["id"]).external_key == f"microsoft:tenant:{TENANT}"
@@ -322,7 +402,7 @@ def _m365_source(client, h):
 def test_personal_context_shows_only_what_rook_asks_for(personal_on, client, session_factory, m365, monkeypatch):
     monkeypatch.setenv("MICROSOFT_ENABLE_SEND", "true")
     as_personal(m365)
-    h = entra_sign_in(client, session_factory, m365)
+    h = sign_in(client, session_factory, m365)
     src = _m365_source(client, h)
     assert {p["scope"] for p in src["requested_permissions"]} == {"offline_access", "User.Read", "Mail.Read",
                                                                   "Calendars.Read"}
@@ -335,7 +415,7 @@ def test_personal_context_shows_only_what_rook_asks_for(personal_on, client, ses
 
 def test_work_context_still_shows_teams_and_sending(personal_on, client, session_factory, m365, monkeypatch):
     monkeypatch.setenv("MICROSOFT_ENABLE_SEND", "true")
-    src = _m365_source(client, entra_sign_in(client, session_factory, m365))
+    src = _m365_source(client, sign_in(client, session_factory, m365))
     assert {"OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"} <= {p["scope"] for p in src["requested_permissions"]}
     assert "teams_transcripts" in {d["key"] for d in src["data_types"]}
     assert src["sending"].startswith("enabled")

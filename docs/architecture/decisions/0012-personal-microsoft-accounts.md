@@ -1,6 +1,7 @@
 # ADR-0012 — Personal Microsoft accounts: one account, one private workspace
 
-- **Status:** accepted (product owner, 2026-10-12). Amends ADR-0011; resolves C-015.
+- **Status:** accepted (product owner, 2026-10-12). Amends ADR-0011; resolves C-015. Sign-in amended 2026-10-12:
+  explicit account-type choice replaces the single `common` sign-in (see "Sign-in: explicit account choice").
 - **Context:** ROOK must also serve people who use a personal Microsoft account (outlook.com, hotmail.com, live.com).
   This must not weaken work/school sign-in or tenant isolation. All personal accounts share one Entra "tenant",
   `9188040d-6c67-4c5b-b112-36a304b66dad`, so that tenant id cannot be an organization identity.
@@ -8,7 +9,7 @@
 ## Decision
 - **Off by default.** `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS` (default `false`). While off, behaviour is exactly ADR-0011:
   sign-in authority `organizations`, personal tokens refused, the personal-accounts key set is not even loaded.
-- **Sign-in authority** when on: `common` (work, school and personal accounts). The browser never chooses the authority.
+- **Sign-in authority** when on: chosen by the kind of account the user picks (below). `common` is no longer used.
 - **Connect / refresh authority** (server-side, from the caller's organization record): the organization's own tenant
   for work accounts; `consumers` for personal accounts.
 - **ID-token validation** is unchanged and still complete: RS256 signature against Microsoft's JWKS, `aud`,
@@ -38,6 +39,23 @@
   key set still blocks sign-in, as before.
 - **Migration:** additive (`ALTER TABLE … ADD COLUMN`, unique index), with an idempotent backfill of `external_key` for
   existing work organizations. Nothing is dropped or rewritten.
+
+## Sign-in: explicit account choice (amendment, 2026-10-12)
+- **Why:** with one *Continue with Microsoft* button on the `common` authority, Microsoft refused a genuine personal
+  account ("You can't sign in here with a personal account") although the app allowed personal accounts, while the
+  same account signed in through `consumers`. ROOK does not work around Microsoft's `common` routing; it asks instead.
+- **Login page:** with personal accounts off, unchanged (one *Continue with Microsoft* button, `organizations`). With
+  them on, two choices: *Continue with work or school account* (`organizations`) and *Continue with personal Microsoft
+  account* (`consumers`).
+- **Bound to the server-side transaction:** `GET /api/auth/microsoft/login?account=work|personal` stores the choice as
+  the sign-in transaction's purpose (`signin` | `signin_personal`, the existing `AuthState.purpose` column; no schema
+  change). The callback reads it only from that stored transaction, never from the browser.
+- **Validated against the returned identity:** the code is exchanged at the same authority it was issued by, and the
+  ID token must match the choice: a personal choice requires the personal-accounts tenant (and its key set); a work
+  or school choice rejects a personal account. All other checks (signature, issuer, audience, expiry, nonce, state,
+  PKCE, tenant and object id, `MICROSOFT_ALLOWED_TENANT_IDS`) are unchanged. A personal choice is refused while
+  personal accounts are off.
+- **Scopes:** sign-in still asks only for `openid profile email User.Read` for either choice.
 
 ## Consequences
 - Turning personal accounts on also needs the Entra app's *Supported account types* to include personal Microsoft
