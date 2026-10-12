@@ -4,6 +4,7 @@ Owner skills: `rook-connectors`, `rook-security`. Decisions:
 - ADR-0003 (connector)
 - ADR-0004 (identity), whose tenant handling is superseded by ADR-0011 (multi-tenant)
 - ADR-0005 (no autonomous sending)
+- ADR-0012 (personal Microsoft accounts, off by default)
 
 ROOK is a multi-tenant SaaS product. **One Entra app registration**, owned by the ROOK publisher, serves every customer:
 
@@ -17,7 +18,7 @@ It is used for two separate flows:
 
 | Flow | When | Authority | Scopes (delegated) |
 |---|---|---|---|
-| **Sign in** | "Continue with Microsoft" | `organizations` (any work or school tenant, never personal accounts) | `openid profile email User.Read` |
+| **Sign in** | "Continue with Microsoft" | `organizations` (any work or school tenant); `common` only when `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=true` | `openid profile email User.Read` |
 | **Connect Microsoft 365** | Each user connects their own mailbox (Sources/Context → Microsoft 365 → Connect) | the user's own tenant | `openid profile email offline_access User.Read Mail.Read Calendars.Read OnlineMeetings.Read OnlineMeetingTranscript.Read.All` |
 
 `Mail.Send` is added only if a deployment sets `MICROSOFT_ENABLE_SEND=true`. It is off by default; don't enable it.
@@ -35,6 +36,17 @@ ROOK reads with **delegated** permissions only. It sees exactly what the signed-
 - **Later users from the same tenant** join that organization as **members**. They don't get admin rights automatically.
 - **Users from a different tenant** get their own, separate organization.
 - **`ROOK_ADMIN_EMAILS`** is a **development-only** shortcut. It is ignored in production and never decides who owns an organization.
+
+## Personal Microsoft accounts (ADR-0012, off by default)
+`MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=false` is the default: personal accounts are refused, exactly as above. With `true`:
+- Sign-in uses the `common` authority. Work and school accounts behave exactly as described above.
+- Each personal account (outlook.com, hotmail.com, live.com) gets **its own private workspace**: it is the only owner
+  and administrator, nobody else can join, and it is never linked to a work account, even one with the same email.
+- Connecting uses the `consumers` authority and only these delegated scopes:
+  `openid profile email offline_access User.Read Mail.Read Calendars.Read`. ROOK reads Outlook mail and calendar;
+  Teams transcripts are shown as *Not available for personal Microsoft accounts*. No `Mail.Send`.
+- The Entra app must also allow personal accounts (step 2: *Accounts in any organizational directory and personal
+  Microsoft accounts*). Change that only together with the server switch, and not in production without a decision.
 
 ## A. Steps in Microsoft Entra (the ROOK publisher's own tenant; no secret values in chat, tickets or the repo)
 
@@ -75,6 +87,7 @@ ROOK reads with **delegated** permissions only. It sees exactly what the signed-
 | `MICROSOFT_CLIENT_ID` | yes | Application (client) ID |
 | `MICROSOFT_CLIENT_SECRET` | yes | client secret **Value** (secret store) |
 | `MICROSOFT_ALLOWED_TENANT_IDS` | no | comma-separated tenant ids allowed to sign in. Empty = any organizational tenant. Useful to limit a test server to your own tenant |
+| `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS` | no | default `false`. `true` lets personal Microsoft accounts sign in, each to its own private workspace (ADR-0012) |
 | `MICROSOFT_TENANT_ID` | no (legacy) | if still set, it **restricts** sign-in to that tenant (old single-tenant behaviour). Remove it for multi-tenant |
 | `ROOK_ENVIRONMENT` | yes in shared environments | `development` (default) or `production`. Production refuses unsafe settings at startup |
 | `ROOK_PUBLIC_API_URL` | yes | must match the redirect URI in step 2 (without `/api/auth/microsoft/callback`) |
@@ -95,7 +108,7 @@ Restart the API after changing these values.
 3. **Second user:** sign in with another account from the same tenant. They land directly in the workspace as a **member**.
 4. **Isolation:** sign in with an account from a different tenant. It gets a separate, empty organization and sees nothing of the first.
 5. **Data:** after connecting, run **Sync now**. You see mail, calendar and (where permitted) Teams transcripts, with any permission gaps explained.
-6. **Negative check:** a personal account (outlook.com / hotmail.com) is refused.
+6. **Negative check:** with `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=false` (default), a personal account (outlook.com / hotmail.com) is refused.
 
 ## Behaviour and limits (MVP)
 - **Sync window:** the first sync reads the last 14 days of mail (up to `MICROSOFT_MAX_MESSAGES_PER_SYNC`, default 500) and the calendar from 14 days back to 14 days ahead. Later syncs are incremental.
@@ -113,7 +126,9 @@ Restart the API after changing these values.
 |---|---|
 | `AADSTS50011` redirect URI mismatch | The redirect URI must equal `<ROOK_PUBLIC_API_URL>/api/auth/microsoft/callback` exactly |
 | `AADSTS50194` "not configured as a multi-tenant application" | Supported account types is still *single tenant* (step 2) |
-| "invalid tenant (personal Microsoft accounts cannot sign in)" | A personal account was used; use a work or school account |
+| "invalid tenant (personal Microsoft accounts cannot sign in)" | A personal account was used while `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=false`; use a work or school account |
+| "Personal Microsoft accounts are not enabled on this ROOK server." | A personal workspace tried to connect or refresh after the switch was turned off |
+| `AADSTS50020` / personal account "doesn't exist in tenant" | The switch is on but the Entra app's supported account types exclude personal accounts |
 | "not enabled on this ROOK server" | `MICROSOFT_ALLOWED_TENANT_IDS` or legacy `MICROSOFT_TENANT_ID` excludes that tenant |
 | `consent_required` / `AADSTS65001` / "Need admin approval" | That tenant blocks user consent or a scope needs admin consent; its administrator must approve ROOK |
 | "This email is already used by another ROOK account" | A different Microsoft identity (`oid`) uses the same email in that organization; ROOK never merges accounts by email |

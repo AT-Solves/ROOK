@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..connectors import REGISTRY
-from ..models import Connector, ConnectorCredential, Signal, User, utcnow
+from ..models import Connector, ConnectorCredential, Organization, Signal, User, utcnow
 from ..trust import FACT, INFERENCE
 from .meetings import visible_meetings
 from .permissions import can_view
@@ -78,13 +78,15 @@ def _visible_counts(db: Session, user: User, connector_id: int | None = None) ->
     return counts
 
 
-def _access(cls, conn: Connector, granted: set[str], last: dict | None) -> list[dict]:
+def _access(cls, conn: Connector, granted: set[str], last: dict | None, personal: bool = False) -> list[dict]:
     """What ROOK can actually read from this connection, per kind of data, with the reason when it can't."""
     gaps = (last or {}).get("gaps", {})
     out = []
     for dt in cls.data_types:
         if conn.status == "disconnected":
             status, reason = "disconnected", "Disconnected: ROOK no longer reads this source."
+        elif personal and not dt.personal:
+            status, reason = "unavailable", "Not available for personal Microsoft accounts."
         elif dt.key in gaps:
             status, reason = gaps[dt.key]["status"], gaps[dt.key]["reason"]
         elif not cls.delegated:
@@ -100,6 +102,11 @@ def _access(cls, conn: Connector, granted: set[str], last: dict | None) -> list[
         out.append({"key": dt.key, "label": dt.label, "context": dt.context, "status": status,
                     "status_label": ACCESS_LABELS[status], "reason": reason, "ok": status == "available"})
     return out
+
+
+def _is_personal(db: Session, conn: Connector) -> bool:
+    org = db.get(Organization, conn.org_id)
+    return bool(org and org.account_type == "personal")
 
 
 def _actions(cls, conn: Connector, user: User) -> list[str]:
@@ -130,7 +137,7 @@ def _connection(db: Session, user: User, conn: Connector, cls) -> dict:
         "last_successful_sync": iso(conn.last_synced_at),
         "last_sync": last,
         "granted_permissions": [{"scope": s, "label": SCOPE_LABELS.get(s, s)} for s in sorted(granted)],
-        "access": _access(cls, conn, granted, last),
+        "access": _access(cls, conn, granted, last, personal=_is_personal(db, conn)),
         "visible_items": {k: counts.get(k, 0) for k in CONTEXT_TYPES},
         "actions": _actions(cls, conn, user),
     }
@@ -138,6 +145,8 @@ def _connection(db: Session, user: User, conn: Connector, cls) -> dict:
 
 def sources(db: Session, user: User) -> list[dict]:
     rows = db.scalars(select(Connector).where(Connector.org_id == user.org_id)).all()
+    org = db.get(Organization, user.org_id)
+    personal = bool(org and org.account_type == "personal")  # only what a personal account can use (ADR-0012)
     out = []
     for kind, cls in REGISTRY.items():
         # Delegated connectors are per user: show only the caller's own connection, never a colleague's account.
@@ -155,9 +164,10 @@ def sources(db: Session, user: User) -> list[dict]:
             "delegated": cls.delegated,
             "connectable": cls.implemented and cls.delegated and cls.is_configured() and not connected,
             "setup_required": cls.implemented and cls.delegated and not cls.is_configured(),
-            "data_types": [{"key": d.key, "type": d.context, "label": d.label} for d in cls.data_types],
-            "requested_permissions": [{"scope": s, "label": SCOPE_LABELS.get(s, s)} for s in cls.scopes],
-            "sending": "enabled — only messages you approve" if cls.sending_enabled() and cls.can_send else "off",
+            "data_types": [{"key": d.key, "type": d.context, "label": d.label} for d in cls.data_types
+                           if d.personal or not personal],
+            "requested_permissions": [{"scope": s, "label": SCOPE_LABELS.get(s, s)} for s in cls.scopes_for(personal)],
+            "sending": "enabled — only messages you approve" if cls.sends_for(personal) and cls.can_send else "off",
             "state": "connected" if connected else ("available" if cls.implemented else "later"),
             "connection": _connection(db, user, conn, cls) if conn is not None else None,
         })

@@ -39,6 +39,8 @@ _ADDED_COLUMNS = {
         "setup_completed_at": "TIMESTAMP",
         "is_demo": "BOOLEAN NOT NULL DEFAULT FALSE",
         "join_policy": "VARCHAR(20) NOT NULL DEFAULT 'auto'",
+        "account_type": "VARCHAR(20) NOT NULL DEFAULT 'organization'",
+        "external_key": "VARCHAR(200)",
     },
     "connector_credentials": {
         "tenant_id": "VARCHAR(64) NOT NULL DEFAULT ''",
@@ -48,6 +50,7 @@ _ADDED_COLUMNS = {
 _UNIQUE_INDEXES = {
     "uq_org_tenant": ("organizations", "identity_provider, tenant_id"),
     "uq_user_subject": ("users", "org_id, external_subject"),
+    "uq_org_external_key": ("organizations", "external_key"),
 }
 
 
@@ -68,6 +71,11 @@ def _upgrade(bind) -> None:
         # Backfill: organizations provisioned from Entra before ADR-0011 carried the tenant only in external_ref.
         conn.execute(text("UPDATE organizations SET identity_provider = 'microsoft', tenant_id = substr(external_ref, 7) "
                           "WHERE tenant_id IS NULL AND external_ref LIKE 'entra:%'"))
+        # Backfill (ADR-0012): every Microsoft organization gets its deterministic identity key. Personal workspaces
+        # are created with theirs; the demo organization has none.
+        conn.execute(text("UPDATE organizations SET external_key = 'microsoft:tenant:' || tenant_id "
+                          "WHERE external_key IS NULL AND identity_provider = 'microsoft' AND tenant_id IS NOT NULL "
+                          "AND account_type = 'organization'"))
 
 
 def get_db() -> Iterator[Session]:

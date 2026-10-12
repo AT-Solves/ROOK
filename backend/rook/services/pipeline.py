@@ -27,6 +27,7 @@ from ..models import (
     Decision,
     Evidence,
     Meeting,
+    Organization,
     Person,
     Project,
     Signal,
@@ -60,6 +61,8 @@ def connector_instance(db: Session, connector: Connector) -> BaseConnector:
     if cls.delegated:
         owner = db.get(User, connector.created_by) if connector.created_by else None
         ctx.owner_email = owner.email if owner else ""
+        org = db.get(Organization, connector.org_id)
+        ctx.personal_account = bool(org and org.account_type == "personal")
         from ..identity.service import access_token_getter
 
         ctx.get_access_token = access_token_getter(db, connector)

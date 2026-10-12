@@ -22,6 +22,10 @@ DATA_SCOPES = (
     "OnlineMeetings.Read",
     "OnlineMeetingTranscript.Read.All",  # requires admin consent; transcripts are skipped if not granted
 )
+# Personal Microsoft accounts (ADR-0012): Outlook mail and calendar only. Teams online meetings and transcripts are
+# not available to personal accounts, so their permissions are never requested.
+PERSONAL_DATA_SCOPES = ("offline_access", "User.Read", "Mail.Read", "Calendars.Read")
+PERSONAL_UNAVAILABLE = "Not available for personal Microsoft accounts."
 SEND_SCOPE = "Mail.Send"  # requested only when MICROSOFT_ENABLE_SEND=true
 
 _MSG_FIELDS = "id,subject,body,bodyPreview,from,sender,toRecipients,ccRecipients,receivedDateTime,webLink,isDraft"
@@ -45,7 +49,7 @@ class Microsoft365Connector(BaseConnector):
         DataType("mail", "conversations", "Outlook mail", ("Mail.Read",)),
         DataType("calendar", "meetings", "Calendar", ("Calendars.Read",)),
         DataType("teams_transcripts", "transcripts", "Teams meeting transcripts",
-                 ("OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"), admin_consent=True),
+                 ("OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"), admin_consent=True, personal=False),
     )
     transport_override: httpx.BaseTransport | None = None  # tests inject a mock Graph here
 
@@ -58,7 +62,18 @@ class Microsoft365Connector(BaseConnector):
         return env_bool("MICROSOFT_ENABLE_SEND", False)
 
     @classmethod
-    def requested_scopes(cls) -> list[str]:
+    def scopes_for(cls, personal: bool = False) -> tuple[str, ...]:
+        return PERSONAL_DATA_SCOPES if personal else cls.scopes
+
+    @classmethod
+    def sends_for(cls, personal: bool = False) -> bool:
+        return not personal and cls.sending_enabled()  # Mail.Send is never requested for a personal account
+
+    @classmethod
+    def requested_scopes(cls, personal: bool = False) -> list[str]:
+        """Delegated permissions to request; decided by the server from the validated account type."""
+        if personal:
+            return ["openid", "profile", "email", *PERSONAL_DATA_SCOPES]
         return ["openid", "profile", "email", *DATA_SCOPES, *([SEND_SCOPE] if cls.sending_enabled() else [])]
 
     def _client(self) -> GraphClient:
@@ -83,7 +98,10 @@ class Microsoft365Connector(BaseConnector):
 
         meetings = [normalize.event_to_meeting(e, owner) for e in events]
         signals = [normalize.message_to_signal(m, owner) for m in messages]
-        if env_bool("MICROSOFT_ENABLE_TRANSCRIPTS", True):
+        if self.context.personal_account:
+            # Never call Teams online-meeting or transcript APIs for a personal account.
+            self.context.access_gaps["teams_transcripts"] = {"status": "unavailable", "reason": PERSONAL_UNAVAILABLE}
+        elif env_bool("MICROSOFT_ENABLE_TRANSCRIPTS", True):
             signals += self._transcripts(graph, events, meetings, now)
         else:
             self.context.access_gaps["teams_transcripts"] = {
@@ -124,6 +142,8 @@ class Microsoft365Connector(BaseConnector):
     def send(self, message: OutboundMessage) -> str:
         if not self.sending_enabled():
             raise ConnectorNotConfigured("Sending through Microsoft 365 is disabled (MICROSOFT_ENABLE_SEND=false).")
+        if self.context.personal_account:
+            raise ConnectorNotConfigured("Sending is not available for personal Microsoft accounts.")
         self._client().post("/me/sendMail", {
             "message": {"subject": message.subject, "body": {"contentType": "Text", "content": message.body},
                         "toRecipients": [{"emailAddress": {"address": a}} for a in message.to]},

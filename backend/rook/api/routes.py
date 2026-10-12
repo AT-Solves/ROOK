@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..ai.providers import provider_name
 from ..auth import current_user, issue_token, require_admin
-from ..config import settings, web_url
+from ..config import personal_accounts_enabled, settings, web_url
 from ..connectors import REGISTRY, ConnectorAuthError, ConnectorNotConfigured, SyncBatch, get_connector_class
 from ..connectors.base import NormalizedSignal
 from ..db import get_db
@@ -85,7 +85,9 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
 def auth_providers():
     p = get_identity_provider("microsoft")
     return {"providers": [{"id": p.id, "name": p.display_name, "configured": p.configured(),
-                           "login_url": "/api/auth/microsoft/login"}],
+                           "login_url": "/api/auth/microsoft/login",
+                           # personal Microsoft accounts may sign in too (ADR-0012; off unless explicitly enabled)
+                           "personal_accounts": personal_accounts_enabled()}],
             "dev_login": settings.dev_login}
 
 
@@ -125,6 +127,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
 
 def _org_dict(org: Organization, user: User) -> dict:
     return {"id": org.id, "name": org.name, "status": org.status, "is_demo": org.is_demo,
+            "account_type": org.account_type,
             "identity_provider": org.identity_provider, "is_owner": org.created_by == user.id,
             # Only an administrator completes setup; members go straight to the workspace.
             "setup_required": org.status == "setup" and user.role == "admin"}
@@ -465,13 +468,15 @@ def signal(sid: int, user: User = Depends(current_user), db: Session = Depends(g
 def sources(user: User = Depends(current_user), db: Session = Depends(get_db)):
     rows = db.scalars(select(Connector).where(Connector.org_id == user.org_id)).all()
     catalog = []
+    org = db.get(Organization, user.org_id)
+    personal = bool(org and org.account_type == "personal")
     for kind, cls in REGISTRY.items():
         # Delegated connectors are per user: show the caller's own connection only.
         c = next((r for r in rows if r.kind == kind and (not cls.delegated or r.created_by == user.id)), None)
         catalog.append({
             "kind": kind, "name": cls.display_name, "category": cls.category, "phase": cls.phase,
             "delegated": cls.delegated, "credentials_present": cls.is_configured(), "required_env": list(cls.required_env),
-            "scopes": list(cls.scopes), "sending_enabled": cls.sending_enabled(),
+            "scopes": list(cls.scopes_for(personal)), "sending_enabled": cls.sends_for(personal),
             "connection": {"id": c.id, "status": c.status, "last_synced_at": iso(c.last_synced_at)} if c else None,
         })
     return sorted(catalog, key=lambda x: (x["phase"], x["name"]))

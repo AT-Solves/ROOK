@@ -94,6 +94,8 @@ class ConnectorContext:
     warnings: list[str] = field(default_factory=list)
     # Data a sync could not read, by DataType.key: {"status": "admin_required" | "disabled" | "unavailable", "reason"}
     access_gaps: dict[str, dict] = field(default_factory=dict)
+    # The connection belongs to a personal Microsoft account's private workspace (ADR-0012).
+    personal_account: bool = False
 
 
 @dataclass(frozen=True)
@@ -110,6 +112,7 @@ class DataType:
     label: str
     scopes: tuple[str, ...] = ()
     admin_consent: bool = False
+    personal: bool = True  # False: not available to personal Microsoft accounts (e.g. Teams transcripts)
 
 
 class BaseConnector(ABC):
@@ -134,6 +137,16 @@ class BaseConnector(ABC):
     @classmethod
     def sending_enabled(cls) -> bool:
         return cls.can_send
+
+    @classmethod
+    def scopes_for(cls, personal: bool = False) -> tuple[str, ...]:
+        """The delegated permissions this source asks for; ``personal``: for a personal Microsoft account (ADR-0012)."""
+        return cls.scopes
+
+    @classmethod
+    def sends_for(cls, personal: bool = False) -> bool:
+        """Whether this source may send approved messages for this kind of account."""
+        return cls.sending_enabled()
 
     @classmethod
     def is_configured(cls) -> bool:

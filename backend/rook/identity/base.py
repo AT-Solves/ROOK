@@ -30,6 +30,7 @@ class IdentityClaims:
     subject: str  # stable user id at the IdP
     email: str
     name: str
+    personal: bool = False  # a personal Microsoft account (from the validated tenant id, never from the browser)
 
 
 class IdentityProvider(ABC):

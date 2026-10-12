@@ -3,6 +3,10 @@
 Multi-tenant (ADR-0011): one Microsoft identity is (tenant id, object id), both read from a validated ID token. The
 tenant id selects the ROOK organization; the object id selects the user in it. Email never links accounts, and no
 tenant ever comes from the browser.
+
+Personal Microsoft accounts (ADR-0012, only when ``MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=true``): all of them share one
+Microsoft tenant, so the tenant is not an organization boundary for them. Each personal account gets its own private
+workspace keyed by its object id; nobody else ever joins it.
 """
 
 from __future__ import annotations
@@ -22,7 +26,7 @@ from ..connectors import ConnectorAuthError, get_connector_class
 from ..crypto import decrypt, encrypt
 from ..models import AuthState, Connector, ConnectorCredential, Organization, User, utcnow
 from .base import ConnectNotAllowed, IdentityClaims, IdentityError, TokenSet
-from .microsoft import get_provider
+from .microsoft import CONSUMER_TENANT, PERSONAL_AUTHORITY, get_provider
 
 SIGNIN_SCOPES = ["openid", "profile", "email", "User.Read"]
 STATE_TTL = timedelta(minutes=10)
@@ -49,29 +53,40 @@ def safe_return_to(value: str | None) -> str:
     return value[:300]
 
 
-def _scopes(provider_id: str, purpose: str) -> list[str]:
+def _scopes(provider_id: str, purpose: str, personal: bool = False) -> list[str]:
     if purpose == "signin":
         return SIGNIN_SCOPES
-    return get_connector_class(CONNECTOR_FOR_PROVIDER[provider_id]).requested_scopes()
+    return get_connector_class(CONNECTOR_FOR_PROVIDER[provider_id]).requested_scopes(personal=personal)
 
 
 def _subject(claims: IdentityClaims) -> str:
     return f"{claims.provider}:{claims.subject}"
 
 
-def _connect_tenant(db: Session, provider_id: str, user: User) -> str:
-    """The tenant a user may connect data from: their own organization's, from the server — never the browser's."""
+@dataclass
+class ConnectTarget:
+    authority: str  # organizational tenant id, or "consumers" for a personal account
+    tenant: str  # the tid the returned token must carry
+    personal: bool
+
+
+def _connect_target(db: Session, provider_id: str, user: User) -> ConnectTarget:
+    """Where a user may connect data from, decided from their own workspace on the server — never the browser."""
     org = db.get(Organization, user.org_id)
-    if org is None or org.identity_provider != provider_id or not org.tenant_id or not user.external_subject:
+    if org is None or org.identity_provider != provider_id or not user.external_subject:
+        raise ConnectNotAllowed("Sign in with your Microsoft account to connect Microsoft 365.")
+    if org.account_type == "personal":
+        return ConnectTarget(authority=PERSONAL_AUTHORITY, tenant=CONSUMER_TENANT, personal=True)
+    if not org.tenant_id:
         raise ConnectNotAllowed("Sign in with your Microsoft work or school account to connect Microsoft 365.")
-    return org.tenant_id
+    return ConnectTarget(authority=org.tenant_id, tenant=org.tenant_id, personal=False)
 
 
 def start(db: Session, provider_id: str, purpose: str, user: User | None = None, return_to: str | None = None) -> str:
     provider = get_provider(provider_id)
     if not provider.configured():
         raise IdentityError(f"{provider.display_name} is not configured on this server.")
-    tenant = _connect_tenant(db, provider_id, user) if purpose == "connect" else None
+    target = _connect_target(db, provider_id, user) if purpose == "connect" else None
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     st = AuthState(state=secrets.token_urlsafe(32), nonce=secrets.token_urlsafe(24), code_verifier=verifier,
@@ -83,8 +98,8 @@ def start(db: Session, provider_id: str, purpose: str, user: User | None = None,
         db.delete(old)
     db.commit()
     return provider.authorization_url(state=st.state, nonce=st.nonce, code_challenge=challenge,
-                                      scopes=_scopes(provider_id, purpose), redirect_uri=redirect_uri(provider_id),
-                                      tenant=tenant)
+                                      scopes=_scopes(provider_id, purpose, bool(target and target.personal)),
+                                      redirect_uri=redirect_uri(provider_id), tenant=target.authority if target else None)
 
 
 def callback(db: Session, provider_id: str, code: str, state: str) -> CallbackResult:
@@ -111,12 +126,12 @@ def callback(db: Session, provider_id: str, code: str, state: str) -> CallbackRe
     user = db.get(User, st.user_id)
     if user is None:
         raise IdentityError("The ROOK user who started this connection no longer exists.")
-    tenant = _connect_tenant(db, provider_id, user)
+    target = _connect_target(db, provider_id, user)
     tokens = provider.exchange_code(code=code, code_verifier=st.code_verifier, redirect_uri=redirect_uri(provider_id),
-                                    scopes=_scopes(provider_id, st.purpose), tenant=tenant)
-    # The returned identity must be this ROOK user's own Microsoft identity in this organization's tenant:
+                                    scopes=_scopes(provider_id, st.purpose, target.personal), tenant=target.authority)
+    # The returned identity must be this ROOK user's own Microsoft identity in this workspace's tenant:
     # same tenant id and same object id. Email never decides it.
-    claims = provider.validate_id_token(tokens.id_token, nonce=st.nonce, expected_tenant=tenant)
+    claims = provider.validate_id_token(tokens.id_token, nonce=st.nonce, expected_tenant=target.tenant)
     if _subject(claims) != user.external_subject:
         raise IdentityError("Connect the Microsoft 365 account you signed in with.")
     connector = store_connection(db, user, CONNECTOR_FOR_PROVIDER[provider_id], tokens, tenant_id=claims.tenant,
@@ -128,10 +143,19 @@ def provision(db: Session, claims: IdentityClaims, org_name=None) -> User:
     """Find or create the organization for the validated tenant and the user for the validated object id.
 
     A new tenant gets a new organization in setup state, and its first user becomes the owner (admin). Later users from
-    the same tenant join as members. ``org_name`` is called only for a new organization.
+    the same tenant join as members. ``org_name`` is called only for a new organization. Personal accounts are
+    provisioned separately (:func:`provision_personal`).
     """
-    org = db.scalar(select(Organization).where(Organization.identity_provider == claims.provider,
-                                               Organization.tenant_id == claims.tenant))
+    if claims.personal:
+        return provision_personal(db, claims)
+    key = f"microsoft:tenant:{claims.tenant}"
+    org = db.scalar(select(Organization).where(Organization.external_key == key))
+    if org is None:  # an organization from before ADR-0012 that has not been backfilled yet
+        org = db.scalar(select(Organization).where(Organization.identity_provider == claims.provider,
+                                                   Organization.tenant_id == claims.tenant,
+                                                   Organization.account_type == "organization"))
+        if org is not None and org.external_key is None:
+            org.external_key = key
     new_org = org is None
     if new_org:
         from ..bootstrap import DEFAULT_POLICY
@@ -139,6 +163,7 @@ def provision(db: Session, claims: IdentityClaims, org_name=None) -> User:
         name = (org_name() if org_name else None) or _name_from_email(claims.email)
         org = Organization(name=name, slug=f"org-{secrets.token_hex(6)}", external_ref=f"entra:{claims.tenant}",
                            identity_provider=claims.provider, tenant_id=claims.tenant, status="setup",
+                           account_type="organization", external_key=key,
                            ai_policy=dict(DEFAULT_POLICY))
         db.add(org)
         db.flush()
@@ -171,6 +196,42 @@ def provision(db: Session, claims: IdentityClaims, org_name=None) -> User:
         if claims.email in admin_emails():  # development convenience only (empty in production)
             user.role = "admin"
     return user
+
+
+def provision_personal(db: Session, claims: IdentityClaims) -> User:
+    """One private workspace per personal Microsoft account, keyed by its object id. Its only member is that account
+    (owner and admin); nobody else ever joins, and email never links it to any other identity."""
+    key = f"microsoft:personal:{claims.subject}"
+    subject = _subject(claims)
+    org = db.scalar(select(Organization).where(Organization.external_key == key))
+    if org is None:
+        from ..bootstrap import DEFAULT_POLICY
+
+        org = Organization(name=_personal_workspace_name(claims), slug=f"me-{secrets.token_hex(6)}",
+                           identity_provider=claims.provider, tenant_id=None, account_type="personal",
+                           external_key=key, status="setup", join_policy="closed", ai_policy=dict(DEFAULT_POLICY))
+        db.add(org)
+        db.flush()
+        user = User(org_id=org.id, email=claims.email, name=claims.name, external_subject=subject, role="admin")
+        db.add(user)
+        db.flush()
+        org.created_by = user.id
+        audit.record(db, org_id=org.id, actor="system", action="org.provisioned", tool=claims.provider,
+                     authorization="first sign-in from a personal Microsoft account", result=org.name)
+        audit.record(db, org_id=org.id, user_id=user.id, actor="system", action="user.provisioned", tool=claims.provider,
+                     authorization="owner of a personal workspace", result=f"{user.email} as admin")
+        return user
+    user = db.scalar(select(User).where(User.org_id == org.id, User.external_subject == subject))
+    if user is None or org.account_type != "personal":
+        raise IdentityError("This personal workspace belongs to another account.")
+    user.name = claims.name or user.name
+    user.email = claims.email  # the account's email changed; identity (oid) is unchanged
+    return user
+
+
+def _personal_workspace_name(claims: IdentityClaims) -> str:
+    first = (claims.name or "").split()[0] if (claims.name or "").strip() and "@" not in claims.name else ""
+    return f"{first}'s workspace" if first else "My workspace"
 
 
 def _name_from_email(email: str) -> str:
@@ -218,10 +279,13 @@ def access_token_getter(db: Session, connector: Connector):
             raise ConnectorAuthError("No stored credentials; connect the source first.")
         owner = db.get(User, cred.user_id)
         org = db.get(Organization, connector.org_id)
+        personal = org is not None and org.account_type == "personal"
+        expected_tenant = CONSUMER_TENANT if personal else (org.tenant_id if org else None)
         # Tokens are used only for the user and tenant that granted them (credentials from before ADR-0011 carry no
         # tenant: they must be reconnected).
         if (owner is None or cred.org_id != connector.org_id or owner.org_id != connector.org_id or org is None
-                or not cred.tenant_id or cred.tenant_id != org.tenant_id or cred.external_subject != owner.external_subject):
+                or not cred.tenant_id or cred.tenant_id != expected_tenant
+                or cred.external_subject != owner.external_subject):
             connector.status = "needs_reauth"
             db.commit()
             raise ConnectorAuthError("Stored Microsoft 365 access does not match this account. Reconnect the source.")
@@ -229,7 +293,8 @@ def access_token_getter(db: Session, connector: Connector):
             return decrypt(cred.access_token_enc)
         try:
             tokens = get_provider(provider_id).refresh(refresh_token=decrypt(cred.refresh_token_enc),
-                                                       scopes=_scopes(provider_id, "connect"), tenant=cred.tenant_id)
+                                                       scopes=_scopes(provider_id, "connect", personal),
+                                                       tenant=PERSONAL_AUTHORITY if personal else cred.tenant_id)
         except IdentityError as exc:
             connector.status = "needs_reauth"
             db.commit()

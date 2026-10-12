@@ -356,6 +356,8 @@ export interface Me {
     status: "setup" | "active";
     is_demo: boolean;
     identity_provider: string | null;
+    /** "personal": a private workspace for one personal Microsoft account (ADR-0012); nobody else can join it. */
+    account_type?: "organization" | "personal";
     is_owner: boolean;
     /** True only for an administrator of an organization that has not completed setup. */
     setup_required: boolean;
@@ -364,6 +366,7 @@ export interface Me {
 }
 
 export interface Providers {
-  providers: { id: string; name: string; configured: boolean; login_url: string }[];
+  /** personal_accounts: the server accepts personal Microsoft accounts as well as work and school accounts (ADR-0012). */
+  providers: { id: string; name: string; configured: boolean; login_url: string; personal_accounts?: boolean }[];
   dev_login: boolean;
 }

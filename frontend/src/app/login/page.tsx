@@ -74,11 +74,13 @@ export default function LoginPage() {
               <section aria-labelledby="sso" className="mt-7 rounded-[var(--radius-md)] border border-line bg-surface px-7 pb-7 pt-6 shadow-[var(--shadow-insight)]">
                 <h2 id="sso" className="flex items-center gap-2.5 text-[15px] font-semibold text-midnight">
                   <RookIcon name="lock" size={17} className="text-gold-deep" />
-                  Use your Microsoft work or school account.
+                  {ms?.personal_accounts ? "Use your Microsoft account (work, school or personal)." : "Use your Microsoft work or school account."}
                 </h2>
                 <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-                  Your organization&apos;s workspace is chosen by your Microsoft account. ROOK uses only information your
-                  organization and your permissions allow it to access.
+                  {ms?.personal_accounts
+                    ? "Your workspace is chosen by your Microsoft account: a work or school account joins your organization's workspace; a personal account gets its own private workspace. ROOK uses only information your permissions allow it to access."
+                    : <>Your organization&apos;s workspace is chosen by your Microsoft account. ROOK uses only information your
+                  organization and your permissions allow it to access.</>}
                 </p>
                 {ms?.configured ? (
                   <a className={`${ROOK_BUTTON.primary} mt-5 w-full py-3 text-[14px]`} href={`${API_BASE}${ms.login_url}?return_to=${encodeURIComponent(returnTo)}`}>
