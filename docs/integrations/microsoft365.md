@@ -18,7 +18,7 @@ It is used for two separate flows:
 
 | Flow | When | Authority | Scopes (delegated) |
 |---|---|---|---|
-| **Sign in** | "Continue with Microsoft" | `organizations` (any work or school tenant); `common` only when `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=true` | `openid profile email User.Read` |
+| **Sign in** | "Continue with Microsoft" ("Continue with work or school account" / "Continue with personal Microsoft account" when personal accounts are on) | `organizations` for work or school; `consumers` for the personal choice (only when `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=true`) | `openid profile email User.Read` |
 | **Connect Microsoft 365** | Each user connects their own mailbox (Sources/Context → Microsoft 365 → Connect) | the user's own tenant | `openid profile email offline_access User.Read Mail.Read Calendars.Read OnlineMeetings.Read OnlineMeetingTranscript.Read.All` |
 
 `Mail.Send` is added only if a deployment sets `MICROSOFT_ENABLE_SEND=true`. It is off by default; don't enable it.
@@ -39,7 +39,9 @@ ROOK reads with **delegated** permissions only. It sees exactly what the signed-
 
 ## Personal Microsoft accounts (ADR-0012, off by default)
 `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=false` is the default: personal accounts are refused, exactly as above. With `true`:
-- Sign-in uses the `common` authority. Work and school accounts behave exactly as described above.
+- The login page offers two choices. *Continue with work or school account* uses `organizations` and behaves exactly
+  as described above. *Continue with personal Microsoft account* uses `consumers`. The choice is stored with the
+  server-side sign-in and the returned account must match it.
 - Each personal account (outlook.com, hotmail.com, live.com) gets **its own private workspace**: it is the only owner
   and administrator, nobody else can join, and it is never linked to a work account, even one with the same email.
 - Connecting uses the `consumers` authority and only these delegated scopes:

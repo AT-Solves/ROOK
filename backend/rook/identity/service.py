@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import audit
-from ..config import admin_emails, public_api_url
+from ..config import admin_emails, personal_accounts_enabled, public_api_url
 from ..connectors import ConnectorAuthError, get_connector_class
 from ..crypto import decrypt, encrypt
 from ..models import AuthState, Connector, ConnectorCredential, Organization, User, utcnow
@@ -53,8 +53,13 @@ def safe_return_to(value: str | None) -> str:
     return value[:300]
 
 
+# Sign-in purposes, by the kind of account the user chose before sign-in (ADR-0012). The choice is stored with the
+# server-side sign-in transaction (AuthState.purpose); the callback never takes it from the browser.
+SIGNIN_PURPOSES = {"signin": False, "signin_personal": True}  # purpose -> personal account
+
+
 def _scopes(provider_id: str, purpose: str, personal: bool = False) -> list[str]:
-    if purpose == "signin":
+    if purpose in SIGNIN_PURPOSES:
         return SIGNIN_SCOPES
     return get_connector_class(CONNECTOR_FOR_PROVIDER[provider_id]).requested_scopes(personal=personal)
 
@@ -87,6 +92,12 @@ def start(db: Session, provider_id: str, purpose: str, user: User | None = None,
     if not provider.configured():
         raise IdentityError(f"{provider.display_name} is not configured on this server.")
     target = _connect_target(db, provider_id, user) if purpose == "connect" else None
+    if purpose == "signin_personal":
+        if not personal_accounts_enabled():
+            raise IdentityError("Personal Microsoft accounts are not enabled on this ROOK server.")
+        authority = PERSONAL_AUTHORITY
+    else:
+        authority = target.authority if target else None  # None: work or school sign-in (organizations)
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     st = AuthState(state=secrets.token_urlsafe(32), nonce=secrets.token_urlsafe(24), code_verifier=verifier,
@@ -99,7 +110,7 @@ def start(db: Session, provider_id: str, purpose: str, user: User | None = None,
     db.commit()
     return provider.authorization_url(state=st.state, nonce=st.nonce, code_challenge=challenge,
                                       scopes=_scopes(provider_id, purpose, bool(target and target.personal)),
-                                      redirect_uri=redirect_uri(provider_id), tenant=target.authority if target else None)
+                                      redirect_uri=redirect_uri(provider_id), tenant=authority)
 
 
 def callback(db: Session, provider_id: str, code: str, state: str) -> CallbackResult:
@@ -111,10 +122,20 @@ def callback(db: Session, provider_id: str, code: str, state: str) -> CallbackRe
     if utcnow() - st.created_at > STATE_TTL:
         raise IdentityError("Sign-in session expired. Please start again.")
     provider = get_provider(provider_id)
-    if st.purpose == "signin":
+    if st.purpose in SIGNIN_PURPOSES:
+        # The kind of account chosen before sign-in (from the stored transaction) fixes the authority for the code
+        # exchange and the kind of identity that may come back: a personal choice only accepts a personal account,
+        # a work or school choice only a work or school account.
+        personal = SIGNIN_PURPOSES[st.purpose]
         tokens = provider.exchange_code(code=code, code_verifier=st.code_verifier, redirect_uri=redirect_uri(provider_id),
-                                        scopes=_scopes(provider_id, st.purpose))
-        claims = provider.validate_id_token(tokens.id_token, nonce=st.nonce)
+                                        scopes=_scopes(provider_id, st.purpose),
+                                        tenant=PERSONAL_AUTHORITY if personal else None)
+        claims = provider.validate_id_token(tokens.id_token, nonce=st.nonce,
+                                            expected_tenant=CONSUMER_TENANT if personal else None)
+        if claims.personal != personal:
+            raise IdentityError("This is a personal Microsoft account. Use “Continue with personal Microsoft account”."
+                                if claims.personal else
+                                "This is a work or school account. Use “Continue with work or school account”.")
         # Identity is (tid, oid). The email used to match source access lists comes from the directory when available.
         claims.email = provider.directory_email(tokens.access_token) or claims.email
         user = provision(db, claims, org_name=lambda: provider.organization_name(tokens.access_token))

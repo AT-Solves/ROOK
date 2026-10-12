@@ -109,3 +109,4 @@ Precedence: 04 Principles > 00 Vision > 01 PRD > 02 MVP Scope > 03 UX/UI Spec > 
   - When `true`: sign-in uses `common`; each personal account gets its own private, closed workspace; there is no shared "personal" organization; work and personal identities are never linked, even with the same email.
   - Personal accounts read Outlook mail and calendar only; Teams transcripts are reported as unavailable.
   - Recorded in ADR-0012.
+  - **Amended (product owner, 2026-10-12):** the single `common` sign-in proved unreliable for personal accounts. When personal accounts are on, the login page offers an explicit choice: work or school (`organizations`) or personal Microsoft account (`consumers`), bound to the server-side sign-in transaction and checked against the returned identity. Recorded in ADR-0012.

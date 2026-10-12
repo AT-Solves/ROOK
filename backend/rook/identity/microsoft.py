@@ -1,9 +1,10 @@
 """Microsoft Entra ID, multi-tenant (ADR-0004, ADR-0011, ADR-0012): OIDC authorization-code flow with PKCE,
 confidential client.
 
-Sign-in uses the ``organizations`` authority (work and school accounts from any tenant). When
-``MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=true`` it uses ``common`` instead, so personal Microsoft accounts can sign in too.
-Connecting data and refreshing tokens use the user's own tenant authority, or ``consumers`` for a personal account.
+The user chooses the kind of account before sign-in, and the choice is bound to the server-side sign-in transaction:
+work and school accounts sign in through the ``organizations`` authority; personal Microsoft accounts (only when
+``MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=true``) through ``consumers``. Connecting data and refreshing tokens use the
+user's own tenant authority, or ``consumers`` for a personal account.
 Every ID token is validated cryptographically against Microsoft's published signing keys (JWKS) and then by claim:
 audience, issuer for the token's tenant, tenant, expiry / not-before / issued-at, nonce and object id. A personal
 account's token must be signed by a key from the personal-accounts key set; a work token by one from the common set.
@@ -26,9 +27,8 @@ from .base import IdentityClaims, IdentityError, IdentityProvider, TokenSet
 log = logging.getLogger(__name__)
 
 LOGIN_HOST = "https://login.microsoftonline.com"
-SIGNIN_AUTHORITY = "organizations"  # work and school accounts from any tenant; never personal accounts
-SIGNIN_AUTHORITY_WITH_PERSONAL = "common"  # work, school and personal accounts (only when explicitly enabled)
-PERSONAL_AUTHORITY = "consumers"  # connecting and refreshing a personal account's Microsoft 365 data
+SIGNIN_AUTHORITY = "organizations"  # work and school sign-in, from any tenant; never personal accounts
+PERSONAL_AUTHORITY = "consumers"  # personal accounts: sign-in, connecting and refreshing (only when enabled)
 JWKS_URL = f"{LOGIN_HOST}/common/discovery/v2.0/keys"
 PERSONAL_JWKS_URL = f"{LOGIN_HOST}/consumers/discovery/v2.0/keys"
 GRAPH = "https://graph.microsoft.com/v1.0"
@@ -43,10 +43,6 @@ CLOCK_SKEW = 60
 def valid_tenant_id(value: str | None) -> bool:
     """An organizational (work or school) tenant id. The personal-accounts tenant is not one."""
     return bool(value) and bool(_GUID.match(value)) and value != CONSUMER_TENANT
-
-
-def signin_authority() -> str:
-    return SIGNIN_AUTHORITY_WITH_PERSONAL if personal_accounts_enabled() else SIGNIN_AUTHORITY
 
 
 class EntraIdProvider(IdentityProvider):
@@ -71,10 +67,10 @@ class EntraIdProvider(IdentityProvider):
 
     @staticmethod
     def _authority(tenant: str | None) -> str:
-        """``None``: sign-in; an organizational tenant id; or ``consumers`` for a personal account. Always chosen
-        by the server."""
+        """``None``: work or school sign-in; an organizational tenant id; or ``consumers`` for a personal account.
+        Always chosen by the server."""
         if tenant is None:
-            return f"{LOGIN_HOST}/{signin_authority()}/oauth2/v2.0"
+            return f"{LOGIN_HOST}/{SIGNIN_AUTHORITY}/oauth2/v2.0"
         if tenant == PERSONAL_AUTHORITY:
             if not personal_accounts_enabled():
                 raise IdentityError("Personal Microsoft accounts are not enabled on this ROOK server.")

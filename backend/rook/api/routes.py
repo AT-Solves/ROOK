@@ -92,9 +92,14 @@ def auth_providers():
 
 
 @router.get("/auth/{provider_id}/login")
-def auth_login(provider_id: str, return_to: str = "/", db: Session = Depends(get_db)):
+def auth_login(provider_id: str, return_to: str = "/", account: str = "work", db: Session = Depends(get_db)):
+    """``account``: the kind of Microsoft account the user chose, ``work`` (work or school) or ``personal``
+    (ADR-0012). It is stored with the sign-in transaction and checked against the identity that comes back."""
+    purpose = {"work": "signin", "personal": "signin_personal"}.get(account)
+    if purpose is None:
+        raise HTTPException(422, "Choose a work or school account or a personal Microsoft account.")
     try:
-        return RedirectResponse(identity.start(db, provider_id, "signin", return_to=return_to), status_code=302)
+        return RedirectResponse(identity.start(db, provider_id, purpose, return_to=return_to), status_code=302)
     except IdentityError as exc:
         raise HTTPException(503, str(exc)) from exc
 

@@ -95,8 +95,8 @@ def session_for(user) -> dict:
     return {"Authorization": f"Bearer {issue_token(user)}"}
 
 
-def entra_sign_in(client, session_factory, fake) -> dict:
-    r = client.get("/api/auth/microsoft/login?return_to=/meetings", follow_redirects=False)
+def entra_sign_in(client, session_factory, fake, account: str = "work") -> dict:
+    r = client.get(f"/api/auth/microsoft/login?return_to=/meetings&account={account}", follow_redirects=False)
     assert r.status_code == 302, r.text
     done = _complete_oauth(client, session_factory, fake, r.headers["location"])
     loc = done.headers["location"]
