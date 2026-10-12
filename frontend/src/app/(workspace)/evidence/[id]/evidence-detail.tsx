@@ -23,7 +23,7 @@ export function EvidenceDetail({ id }: { id: number }) {
     <StateGate state={state} what="this source">
       {(s) => (
         <>
-          <RookPageHeader size="detail" eyebrow="Original source" title={s.title} tagline={`${s.channel} · ${s.author || "System"} · ${formatDateTime(s.occurred_at)}`} />
+          <RookPageHeader size="detail" eyebrow="Original source" title={s.title} tagline={`${s.channel}${s.author && s.author !== s.channel ? ` · ${s.author}` : ""} · ${formatDateTime(s.occurred_at)}`} />
           <RookCard as="dl" level={1} flush className="mb-10 px-5 py-1 md:px-6">
             <Field label="Source type">
               <span className="inline-flex items-center gap-2">

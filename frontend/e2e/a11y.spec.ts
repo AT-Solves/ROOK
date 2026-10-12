@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+import { withMicrosoft365 } from "./context-fixture";
 import { signIn } from "./helpers";
 
 /** WCAG 2.2 AA (UX §15): no serious or critical axe violations on any P0 screen. */
@@ -18,6 +19,16 @@ test("login screen", async ({ page }) => {
   await page.getByText("Explore a synthetic workspace").click();
   await expect(page.getByRole("button", { name: "Enter demo" })).toBeVisible();
   await audit(page, "login: synthetic workspace open");
+});
+
+test("context control center with a Microsoft 365 permission gap", async ({ page }) => {
+  await signIn(page);
+  await withMicrosoft365(page);
+  await page.goto("/context");
+  await expect(page.getByRole("article", { name: "Microsoft 365" })).toBeVisible();
+  await audit(page, "context: microsoft 365 connected");
+  await page.getByRole("article", { name: "Microsoft 365" }).getByRole("button", { name: "Disconnect" }).click();
+  await audit(page, "context: confirm disconnect");
 });
 
 test("organization setup", async ({ page }) => {
@@ -43,7 +54,7 @@ test("all P0 workspace screens", async ({ page }) => {
   await expect(page.getByRole("article")).toBeVisible();
   await audit(page, "ask");
 
-  for (const [path, heading] of [["/meetings", "Meetings"], ["/decisions", "Decisions"], ["/commitments", "Commitments"], ["/risks", "Risks"], ["/sources", "Sources"]] as const) {
+  for (const [path, heading] of [["/meetings", "Meetings"], ["/decisions", "Decisions"], ["/commitments", "Commitments"], ["/risks", "Risks"], ["/context", "Context"]] as const) {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
     await page.waitForLoadState("networkidle");
