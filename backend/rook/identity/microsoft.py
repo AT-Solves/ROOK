@@ -1,9 +1,12 @@
-"""Microsoft Entra ID, multi-tenant (ADR-0004, ADR-0011): OIDC authorization-code flow with PKCE, confidential client.
+"""Microsoft Entra ID, multi-tenant (ADR-0004, ADR-0011, ADR-0012): OIDC authorization-code flow with PKCE,
+confidential client.
 
-Sign-in uses the ``organizations`` authority, so any work or school account can sign in and personal Microsoft
-accounts cannot. Connecting data and refreshing tokens use the user's own tenant authority. Every ID token is
-validated cryptographically against Microsoft's published signing keys (JWKS) and then by claim: audience, issuer
-for the token's tenant, tenant, expiry / not-before / issued-at, nonce and object id.
+Sign-in uses the ``organizations`` authority (work and school accounts from any tenant). When
+``MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=true`` it uses ``common`` instead, so personal Microsoft accounts can sign in too.
+Connecting data and refreshing tokens use the user's own tenant authority, or ``consumers`` for a personal account.
+Every ID token is validated cryptographically against Microsoft's published signing keys (JWKS) and then by claim:
+audience, issuer for the token's tenant, tenant, expiry / not-before / issued-at, nonce and object id. A personal
+account's token must be signed by a key from the personal-accounts key set; a work token by one from the common set.
 """
 
 from __future__ import annotations
@@ -17,14 +20,17 @@ from urllib.parse import urlencode
 import httpx
 import jwt
 
-from ..config import allowed_tenants, env
+from ..config import allowed_tenants, env, personal_accounts_enabled
 from .base import IdentityClaims, IdentityError, IdentityProvider, TokenSet
 
 log = logging.getLogger(__name__)
 
 LOGIN_HOST = "https://login.microsoftonline.com"
 SIGNIN_AUTHORITY = "organizations"  # work and school accounts from any tenant; never personal accounts
+SIGNIN_AUTHORITY_WITH_PERSONAL = "common"  # work, school and personal accounts (only when explicitly enabled)
+PERSONAL_AUTHORITY = "consumers"  # connecting and refreshing a personal account's Microsoft 365 data
 JWKS_URL = f"{LOGIN_HOST}/common/discovery/v2.0/keys"
+PERSONAL_JWKS_URL = f"{LOGIN_HOST}/consumers/discovery/v2.0/keys"
 GRAPH = "https://graph.microsoft.com/v1.0"
 # The tenant that issues tokens for personal Microsoft accounts (outlook.com, hotmail.com, live.com).
 CONSUMER_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad"
@@ -35,7 +41,12 @@ CLOCK_SKEW = 60
 
 
 def valid_tenant_id(value: str | None) -> bool:
+    """An organizational (work or school) tenant id. The personal-accounts tenant is not one."""
     return bool(value) and bool(_GUID.match(value)) and value != CONSUMER_TENANT
+
+
+def signin_authority() -> str:
+    return SIGNIN_AUTHORITY_WITH_PERSONAL if personal_accounts_enabled() else SIGNIN_AUTHORITY
 
 
 class EntraIdProvider(IdentityProvider):
@@ -44,7 +55,7 @@ class EntraIdProvider(IdentityProvider):
 
     def __init__(self, transport: httpx.BaseTransport | None = None):
         self._transport = transport
-        self._keys: dict[str, object] = {}
+        self._keys: dict[str, tuple[object, frozenset[str]]] = {}  # kid -> (key, key sets it was published in)
         self._keys_at = 0.0
         self._lock = threading.Lock()
 
@@ -60,9 +71,17 @@ class EntraIdProvider(IdentityProvider):
 
     @staticmethod
     def _authority(tenant: str | None) -> str:
-        if tenant is not None and not valid_tenant_id(tenant):
+        """``None``: sign-in; an organizational tenant id; or ``consumers`` for a personal account. Always chosen
+        by the server."""
+        if tenant is None:
+            return f"{LOGIN_HOST}/{signin_authority()}/oauth2/v2.0"
+        if tenant == PERSONAL_AUTHORITY:
+            if not personal_accounts_enabled():
+                raise IdentityError("Personal Microsoft accounts are not enabled on this ROOK server.")
+            return f"{LOGIN_HOST}/{PERSONAL_AUTHORITY}/oauth2/v2.0"
+        if not valid_tenant_id(tenant):
             raise IdentityError("Invalid Microsoft tenant.")
-        return f"{LOGIN_HOST}/{tenant or SIGNIN_AUTHORITY}/oauth2/v2.0"
+        return f"{LOGIN_HOST}/{tenant}/oauth2/v2.0"
 
     def authorization_url(self, *, state, nonce, code_challenge, scopes, redirect_uri, tenant=None) -> str:
         q = {"client_id": self.client_id, "response_type": "code", "redirect_uri": redirect_uri, "response_mode": "query",
@@ -93,20 +112,28 @@ class EntraIdProvider(IdentityProvider):
                            tenant)
 
     # -- signing keys -------------------------------------------------------------------------
-    def _load_keys(self) -> None:
+    def _fetch_keys(self, url: str) -> list[dict]:
         try:
-            r = self._http().get(JWKS_URL)
+            r = self._http().get(url)
             r.raise_for_status()
-            keys = r.json().get("keys", [])
+            return r.json().get("keys", [])
         except (httpx.HTTPError, ValueError) as exc:
             raise IdentityError("Could not load Microsoft's signing keys. Try again shortly.") from exc
-        loaded = {}
-        for k in keys:
-            if k.get("kty") == "RSA" and k.get("kid") and k.get("use", "sig") == "sig":
-                try:
-                    loaded[k["kid"]] = jwt.PyJWK(k, algorithm="RS256").key
-                except jwt.PyJWKError:
-                    continue
+
+    def _load_keys(self) -> None:
+        sets = {"common": JWKS_URL}
+        if personal_accounts_enabled():
+            sets["consumers"] = PERSONAL_JWKS_URL
+        loaded: dict[str, tuple[object, frozenset[str]]] = {}
+        for name, url in sets.items():
+            for k in self._fetch_keys(url):
+                if k.get("kty") == "RSA" and k.get("kid") and k.get("use", "sig") == "sig":
+                    try:
+                        key = jwt.PyJWK(k, algorithm="RS256").key
+                    except jwt.PyJWKError:
+                        continue
+                    prev = loaded.get(k["kid"])
+                    loaded[k["kid"]] = (prev[0] if prev else key, (prev[1] if prev else frozenset()) | {name})
         if not loaded:
             raise IdentityError("Microsoft returned no usable signing keys.")
         self._keys, self._keys_at = loaded, time.time()
@@ -118,10 +145,10 @@ class EntraIdProvider(IdentityProvider):
                 self._load_keys()
             elif kid not in self._keys and now - self._keys_at > JWKS_MIN_REFRESH:
                 self._load_keys()  # Microsoft rotates keys; refetch once for an unknown key id
-            key = self._keys.get(kid)
-        if key is None:
+            entry = self._keys.get(kid)
+        if entry is None:
             raise IdentityError("ID token rejected: unknown signing key")
-        return key
+        return entry
 
     # -- ID token -----------------------------------------------------------------------------
     def validate_id_token(self, id_token: str, *, nonce: str, expected_tenant: str | None = None) -> IdentityClaims:
@@ -132,8 +159,16 @@ class EntraIdProvider(IdentityProvider):
         if header.get("alg") != "RS256" or not header.get("kid"):
             raise IdentityError("ID token rejected: unexpected signing algorithm")
         try:
+            key, key_sets = self._signing_key(header["kid"])
+        except IdentityError:
+            # Rejected either way. The unverified tenant only picks a clearer message when personal accounts are off
+            # (their key set is then never loaded, so a personal token's key is always unknown).
+            if not personal_accounts_enabled() and _unverified_tid(id_token) == CONSUMER_TENANT:
+                raise IdentityError("ID token rejected: invalid tenant (personal Microsoft accounts cannot sign in)") from None
+            raise
+        try:
             claims = jwt.decode(
-                id_token, self._signing_key(header["kid"]), algorithms=["RS256"], audience=self.client_id,
+                id_token, key, algorithms=["RS256"], audience=self.client_id,
                 leeway=CLOCK_SKEW, options={"require": ["exp", "iat", "aud", "iss", "tid", "oid", "nonce"],
                                             "verify_signature": True, "verify_aud": True, "verify_exp": True,
                                             "verify_iat": True, "verify_nbf": True, "verify_iss": False})
@@ -151,15 +186,24 @@ class EntraIdProvider(IdentityProvider):
             raise IdentityError("ID token rejected: issued in the future")
 
         tid = str(claims["tid"]).lower()
-        if not valid_tenant_id(tid):
-            raise IdentityError("ID token rejected: invalid tenant (personal Microsoft accounts cannot sign in)")
+        personal = tid == CONSUMER_TENANT
+        if personal:
+            # Personal accounts: only when explicitly enabled, and only with a key from the personal-accounts key set.
+            if not personal_accounts_enabled():
+                raise IdentityError("ID token rejected: invalid tenant (personal Microsoft accounts cannot sign in)")
+            if "consumers" not in key_sets:
+                raise IdentityError("ID token rejected: invalid signing key for a personal account")
+        elif not valid_tenant_id(tid):
+            raise IdentityError("ID token rejected: invalid tenant")
+        elif "common" not in key_sets:
+            raise IdentityError("ID token rejected: invalid signing key for a work or school account")
         # The issuer must be the token's own tenant (multi-tenant validation; the signature has been verified).
         if claims.get("iss") != f"{LOGIN_HOST}/{tid}/v2.0":
             raise IdentityError("ID token rejected: invalid issuer")
         if expected_tenant is not None and tid != expected_tenant.lower():
             raise IdentityError("ID token rejected: invalid tenant (the account belongs to another organization)")
-        allowed = allowed_tenants()
-        if allowed and tid not in allowed:
+        allowed = allowed_tenants()  # work and school tenants only; personal accounts are governed by their own switch
+        if not personal and allowed and tid not in allowed:
             raise IdentityError("ID token rejected: invalid tenant (this organization is not enabled on this ROOK server)")
         if claims.get("nonce") != nonce:
             raise IdentityError("ID token rejected: invalid nonce")
@@ -170,7 +214,7 @@ class EntraIdProvider(IdentityProvider):
         if "@" not in email:
             raise IdentityError("Your Microsoft account has no email address ROOK can use.")
         return IdentityClaims(provider=self.id, tenant=tid, subject=str(claims["oid"]), email=email,
-                              name=claims.get("name") or email)
+                              name=claims.get("name") or email, personal=personal)
 
     def directory_email(self, access_token: str) -> str | None:
         """The primary SMTP address from the directory (Graph GET /me ``mail``, readable with User.Read).
@@ -212,3 +256,11 @@ def get_provider(provider_id: str) -> IdentityProvider:
 
 def set_provider_for_tests(provider: IdentityProvider) -> None:
     _PROVIDERS[provider.id] = provider
+
+
+def _unverified_tid(id_token: str) -> str:
+    """The token's tid claim WITHOUT verification: used only to choose an error message, never to accept a token."""
+    try:
+        return str(jwt.decode(id_token, options={"verify_signature": False}).get("tid", "")).lower()
+    except jwt.PyJWTError:
+        return ""

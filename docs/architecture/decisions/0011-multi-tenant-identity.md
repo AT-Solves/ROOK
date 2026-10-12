@@ -1,6 +1,7 @@
 # ADR-0011 — Multi-tenant Microsoft identity: one tenant, one ROOK organization
 
 - **Status:** accepted (product owner, 2026-10-11). Supersedes the single-tenant parts of ADR-0004.
+- **Amended by ADR-0012:** personal Microsoft accounts can be allowed with `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=true` (off by default; with it off, everything below is unchanged).
 - **Context:** ROOK is an enterprise SaaS product. Users from any Microsoft 365 organization must be able to sign in with their work or school account and arrive in their own, isolated ROOK organization.
 
 ## Decision

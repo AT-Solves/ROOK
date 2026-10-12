@@ -101,3 +101,11 @@ Precedence: 04 Principles > 00 Vision > 01 PRD > 02 MVP Scope > 03 UX/UI Spec > 
   - `ROOK_ENVIRONMENT` guards production.
   - The session cookie change is deferred to a separate hardening PR.
   - Recorded in ADR-0011.
+
+### C-015 — Work/school-only sign-in vs personal Microsoft accounts
+- **Artifacts:** ADR-0011 and `docs/integrations/microsoft365.md` refuse personal Microsoft accounts (sign-in authority `organizations`; the personal-accounts tenant `9188040d-…` is rejected). The product-owner brief (2026-10-12) asks ROOK to also support personal Microsoft accounts.
+- **Resolution (product owner, 2026-10-12):** **Supported behind a switch, off by default.**
+  - `MICROSOFT_ALLOW_PERSONAL_ACCOUNTS=false` keeps ADR-0011 behaviour exactly (authority `organizations`, personal accounts refused).
+  - When `true`: sign-in uses `common`; each personal account gets its own private, closed workspace; there is no shared "personal" organization; work and personal identities are never linked, even with the same email.
+  - Personal accounts read Outlook mail and calendar only; Teams transcripts are reported as unavailable.
+  - Recorded in ADR-0012.

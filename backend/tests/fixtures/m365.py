@@ -21,15 +21,30 @@ OTHER_TENANT = "22222222-3333-4444-5555-666666666666"
 CLIENT_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 ME = "yamini@contoso.example"
 KID = "test-signing-key"
+PERSONAL_KID = "test-personal-signing-key"
+CONSUMER_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad"  # Microsoft's tenant for personal accounts
 
-# Microsoft's signing key, as far as these tests are concerned; ATTACKER_KEY is one Microsoft never published.
+# Microsoft's signing keys, as far as these tests are concerned: one published for work and school accounts (common),
+# one for personal accounts (consumers). ATTACKER_KEY is one Microsoft never published.
 SIGNING_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+PERSONAL_SIGNING_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 ATTACKER_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
+def _jwk(key, kid: str) -> dict:
+    return json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key())) | {"kid": kid, "use": "sig", "alg": "RS256"}
+
+
 def jwks() -> dict:
-    jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(SIGNING_KEY.public_key()))
-    return {"keys": [jwk | {"kid": KID, "use": "sig", "alg": "RS256"}]}
+    return {"keys": [_jwk(SIGNING_KEY, KID)]}
+
+
+def personal_jwks() -> dict:
+    return {"keys": [_jwk(PERSONAL_SIGNING_KEY, PERSONAL_KID)]}
+
+
+def sign_personal(claims: dict) -> str:
+    return jwt.encode(claims, PERSONAL_SIGNING_KEY, algorithm="RS256", headers={"kid": PERSONAL_KID})
 
 
 def sign(claims: dict, *, key=None, kid: str = KID, alg: str = "RS256") -> str:
@@ -68,6 +83,7 @@ class FakeM365:
         self.org_names = {TENANT: "Contoso", OTHER_TENANT: "Fabrikam"}
         self.tamper = None  # optional callable(claims) -> id_token, to issue forged or malformed tokens
         self.authorities: list[str] = []  # tenant segment of every token request (organizations | <tenant id>)
+        self.token_scopes: list[str] = []  # scope parameter of every token request
         self.sent: list[dict] = []
         self.graph_calls: list[str] = []
         self.throttle_once = False
@@ -79,15 +95,19 @@ class FakeM365:
     def _token(self, request: httpx.Request) -> httpx.Response:
         if request.url.path == "/common/discovery/v2.0/keys":
             return httpx.Response(200, json=jwks())
+        if request.url.path == "/consumers/discovery/v2.0/keys":
+            return httpx.Response(200, json=personal_jwks())
         self.authorities.append(request.url.path.split("/")[1])
         form = parse_qs(request.content.decode())
+        self.token_scopes.append(form.get("scope", [""])[0])
         if form.get("grant_type") == ["refresh_token"]:
             self.refreshes += 1
             return httpx.Response(200, json={"access_token": "at-refreshed", "refresh_token": "rt-2", "expires_in": 3600})
         if form.get("code") != ["good-code"]:
             return httpx.Response(400, json={"error": "invalid_grant"})
         claims = id_claims(self.nonce, tid=self.tid, oid=self.oid, email=self.email, name=self.display_name)
-        token = self.tamper(claims) if self.tamper else sign(claims)
+        default = sign_personal if self.tid == CONSUMER_TENANT else sign
+        token = self.tamper(claims) if self.tamper else default(claims)
         return httpx.Response(200, json={"access_token": f"at-{self.tid}", "refresh_token": "rt-1", "expires_in": 3600,
                                          "scope": form.get("scope", [""])[0], "id_token": token})
 

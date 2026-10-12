@@ -94,6 +94,8 @@ class ConnectorContext:
     warnings: list[str] = field(default_factory=list)
     # Data a sync could not read, by DataType.key: {"status": "admin_required" | "disabled" | "unavailable", "reason"}
     access_gaps: dict[str, dict] = field(default_factory=dict)
+    # The connection belongs to a personal Microsoft account's private workspace (ADR-0012).
+    personal_account: bool = False
 
 
 @dataclass(frozen=True)
@@ -110,6 +112,7 @@ class DataType:
     label: str
     scopes: tuple[str, ...] = ()
     admin_consent: bool = False
+    personal: bool = True  # False: not available to personal Microsoft accounts (e.g. Teams transcripts)
 
 
 class BaseConnector(ABC):

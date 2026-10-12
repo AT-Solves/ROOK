@@ -100,6 +100,13 @@ def allowed_tenants() -> set[str]:
     return {t.strip().lower() for t in raw.split(",") if t.strip()}
 
 
+def personal_accounts_enabled() -> bool:
+    """Personal Microsoft accounts (Outlook.com, Hotmail) may sign in only when explicitly enabled. Off by default.
+
+    Independent of ``MICROSOFT_ALLOWED_TENANT_IDS``, which restricts work and school tenants only."""
+    return env_bool("MICROSOFT_ALLOW_PERSONAL_ACCOUNTS", False)
+
+
 DEFAULT_SECRET_KEY = "dev-only-change-me"
 
 

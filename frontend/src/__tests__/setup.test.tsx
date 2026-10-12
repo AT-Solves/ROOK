@@ -15,7 +15,7 @@ vi.mock("@/lib/api", async (orig) => ({ ...(await orig<typeof import("@/lib/api"
 function me(org: Partial<Me["org"]> = {}, role: "admin" | "member" = "admin"): Me {
   return {
     user: { id: 1, email: "ana@fabrikam.example", name: "Ana Silva", title: "", role, org_id: 7, timezone: "UTC" },
-    org: { id: 7, name: "Fabrikam", status: "setup", is_demo: false, identity_provider: "microsoft", is_owner: true, setup_required: true, ...org },
+    org: { id: 7, name: "Fabrikam", status: "setup", is_demo: false, identity_provider: "microsoft", account_type: "organization", is_owner: true, setup_required: true, ...org },
     llm: "rules",
   };
 }
@@ -54,5 +54,22 @@ describe("organization setup (ADR-0011)", () => {
     render(<SetupPage />);
     fireEvent.click(await screen.findByRole("button", { name: "Confirm organization" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Enter your organization's name.");
+  });
+
+  it("a personal Microsoft account sets up a private workspace that nobody else joins (ADR-0012)", async () => {
+    api.me.mockResolvedValue(me({ name: "Ana's workspace", account_type: "personal" }));
+    api.completeOrgSetup.mockResolvedValue({ ...me().org, name: "Ana's workspace", account_type: "personal", status: "active", setup_required: false });
+    render(<SetupPage />);
+    expect(await screen.findByRole("heading", { name: "Set up your workspace" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Workspace name")).toHaveValue("Ana's workspace");
+    expect(screen.getByText(/private workspace that only you can use/)).toBeInTheDocument();
+    expect(screen.queryByText(/Colleagues/)).toBeNull();
+    expect(screen.queryByText(/organization/i)).toBeNull();
+    expect(screen.getByText("Personal Microsoft account")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm workspace" }));
+    await waitFor(() => expect(api.completeOrgSetup).toHaveBeenCalledWith("Ana's workspace"));
+    expect(await screen.findByText("Meeting transcripts are not available for personal Microsoft accounts.")).toBeInTheDocument();
+    expect(screen.queryByText(/Teams/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Connect Outlook mail and calendar" })).toBeEnabled();
   });
 });

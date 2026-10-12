@@ -20,8 +20,13 @@ def utcnow() -> datetime:
 
 
 class Organization(Base):
-    """One customer organization. For Microsoft sign-in it maps to exactly one Entra tenant (ADR-0011): the validated
-    token's ``tid`` is the authoritative organization identity, never anything the browser sends."""
+    """One customer organization or one person's private workspace (ADR-0011, ADR-0012).
+
+    ``account_type = "organization"``: maps to exactly one Entra tenant; the validated token's ``tid`` is the
+    authoritative organization identity, never anything the browser sends.
+    ``account_type = "personal"``: one personal Microsoft account's private workspace, keyed by that account's ``oid``;
+    ``tenant_id`` stays empty because every personal account shares one Microsoft tenant.
+    ``external_key`` is the unique identity: ``microsoft:tenant:<tid>`` or ``microsoft:personal:<oid>``."""
 
     __tablename__ = "organizations"
     __table_args__ = (UniqueConstraint("identity_provider", "tenant_id"),)
@@ -31,12 +36,15 @@ class Organization(Base):
     # Identity-provider tenant this org maps to, e.g. "entra:<tenant-id>" (ADR-0004). Provider-neutral string.
     external_ref: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
     identity_provider: Mapped[str | None] = mapped_column(String(40), nullable=True)  # "microsoft"
+    account_type: Mapped[str] = mapped_column(String(20), default="organization")  # organization | personal
+    external_key: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
     tenant_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # Entra tenant id (GUID)
     status: Mapped[str] = mapped_column(String(20), default="active")  # setup | active
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)  # the first user: initial owner/admin
     setup_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)  # the synthetic workspace; only it allows demo login
     # How users from the same tenant join: "auto" (as members). "approval" is reserved for a later admin-approval flow.
+    # "closed": nobody else joins (personal workspaces).
     join_policy: Mapped[str] = mapped_column(String(20), default="auto")
     # AI action policy (§19, §53). Keys: create_task, send_email, send_message -> "never" | "approval" | "auto"
     ai_policy: Mapped[dict] = mapped_column(JSON, default=dict)
