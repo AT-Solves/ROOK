@@ -67,9 +67,20 @@ test("a connected Microsoft 365 source shows what ROOK can and cannot read", asy
   await expect(ms.getByRole("button", { name: "Disconnect" })).toBeVisible();
 });
 
-test("old Sources links and the OAuth return open the Context Control Center", async ({ page }) => {
+test("the OAuth return (also via old Sources links) runs the first sync exactly once", async ({ page }) => {
   await signIn(page);
+  const syncs: string[] = [];
+  await page.route("**/api/sources/*/sync", async (route) => {
+    syncs.push(new URL(route.request().url()).pathname);
+    await route.fulfill({ json: { connector: "microsoft365", signals_new: 3, meetings_upserted: 2, mode: "delegated" } });
+  });
   await page.goto("/sources?connected=microsoft365&id=1");
-  await expect(page).toHaveURL(/\/context\?connected=microsoft365&id=1$/);
-  await expect(page.getByRole("main").getByRole("status").first()).toContainText("Connected.");
+  const status = page.getByRole("main").getByRole("status").first();
+  await expect(status).toContainText("Microsoft 365 connected and synchronized: 3 new items, 2 meetings.");
+  await expect(page).toHaveURL(/\/context$/); // the connection event is consumed
+  expect(syncs).toEqual(["/api/sources/1/sync"]);
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: "Context" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(syncs).toHaveLength(1); // a refresh does not sync again
 });

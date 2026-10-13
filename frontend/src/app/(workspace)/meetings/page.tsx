@@ -34,6 +34,27 @@ function MeetingRow({ m }: { m: Meeting }) {
   );
 }
 
+/**
+ * Why there are no meetings, from the Microsoft 365 connection's real state: not connected, connected but never
+ * synchronized, or synchronized with nothing in the calendar period ROOK reads.
+ */
+function NoMeetings() {
+  const ctx = useApi(() => api.context());
+  if (!ctx.data) return <Empty title="No meetings yet." />;
+  const ms = ctx.data.sources.find((s) => s.kind === "microsoft365");
+  if (ms?.state !== "connected") {
+    return <Empty title="No meetings yet.">Connect your calendar in Context and ROOK will prepare you for upcoming meetings.</Empty>;
+  }
+  if (!ms.connection?.last_successful_sync) {
+    return (
+      <Empty title="Your Microsoft 365 calendar is connected but hasn't been synchronized yet.">
+        ROOK will prepare your meetings after the first sync.
+      </Empty>
+    );
+  }
+  return <Empty title="No meetings found for the available calendar period." />;
+}
+
 export default function MeetingsPage() {
   const state = useApi(() => api.meetings());
   return (
@@ -48,7 +69,7 @@ export default function MeetingsPage() {
         state={state}
         what="your meetings"
         isEmpty={(d) => d.length === 0}
-        empty={<Empty title="No meetings yet.">Connect your calendar in Sources and ROOK will prepare you for upcoming meetings.</Empty>}
+        empty={<NoMeetings />}
       >
         {(all) => {
           const upcoming = all.filter((m) => !m.past);
