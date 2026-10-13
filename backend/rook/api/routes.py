@@ -18,6 +18,7 @@ from ..db import get_db
 from ..identity import ConnectNotAllowed, IdentityError
 from ..identity import get_provider as get_identity_provider
 from ..identity import service as identity
+from ..identity.diagnostics import oauth_failure
 from ..models import (
     ActionProposal,
     AuditLog,
@@ -106,11 +107,15 @@ def auth_login(provider_id: str, return_to: str = "/", account: str = "work", db
 
 @router.get("/auth/{provider_id}/callback")
 def auth_callback(provider_id: str, code: str | None = None, state: str | None = None, error: str | None = None,
-                  db: Session = Depends(get_db)):
+                  error_description: str | None = None, db: Session = Depends(get_db)):
     """OAuth redirect target for both sign-in and connecting a data source. Tokens never appear in URLs except
     ROOK's own session token, which is passed in the fragment (not sent to servers or logged)."""
     from urllib.parse import quote
 
+    if error:
+        # Microsoft reported a failure: log safe diagnostics only (rook.identity.diagnostics), never the query.
+        oauth_failure("authorization_callback", account=identity.account_for_state(db, provider_id, state),
+                      error=error, description=error_description)
     if error or not code or not state:
         return RedirectResponse(f"{web_url()}/login?error={quote(error or 'missing_code')}", status_code=302)
     try:

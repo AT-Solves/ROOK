@@ -23,6 +23,7 @@ import jwt
 
 from ..config import allowed_tenants, env, personal_accounts_enabled
 from .base import IdentityClaims, IdentityError, IdentityProvider, TokenSet
+from .diagnostics import oauth_failure
 
 log = logging.getLogger(__name__)
 
@@ -93,6 +94,13 @@ class EntraIdProvider(IdentityProvider):
             raise IdentityError("Could not reach Microsoft sign-in. Try again shortly.") from exc
         body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
         if r.status_code >= 400 or "access_token" not in body:
+            # Safe diagnostics only (never the request, the response or its description as received).
+            oauth_failure("token_exchange" if data.get("grant_type") == "authorization_code" else "token_refresh",
+                          account="personal" if tenant == PERSONAL_AUTHORITY else "work",
+                          error=body.get("error"), error_codes=body.get("error_codes"),
+                          description=body.get("error_description"), http_status=r.status_code,
+                          request_id=body.get("trace_id") or r.headers.get("x-ms-request-id"),
+                          correlation_id=body.get("correlation_id"))
             # Error codes (e.g. invalid_grant, consent_required) are safe to surface; descriptions may include IDs.
             raise IdentityError(f"Microsoft sign-in failed: {body.get('error', r.status_code)}")
         return TokenSet(access_token=body["access_token"], refresh_token=body.get("refresh_token", ""),
