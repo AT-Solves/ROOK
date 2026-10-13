@@ -113,6 +113,21 @@ def start(db: Session, provider_id: str, purpose: str, user: User | None = None,
                                       redirect_uri=redirect_uri(provider_id), tenant=authority)
 
 
+def account_for_state(db: Session, provider_id: str, state: str | None) -> str | None:
+    """The kind of account ("work" | "personal") a pending sign-in or connection is for, read from the stored
+    transaction without consuming it. Used only to label failure diagnostics."""
+    if not state or len(state) > 100:
+        return None
+    st = db.scalar(select(AuthState).where(AuthState.state == state, AuthState.provider == provider_id))
+    if st is None:
+        return None
+    if st.purpose in SIGNIN_PURPOSES:
+        return "personal" if SIGNIN_PURPOSES[st.purpose] else "work"
+    user = db.get(User, st.user_id) if st.user_id else None
+    org = db.get(Organization, user.org_id) if user else None
+    return None if org is None else ("personal" if org.account_type == "personal" else "work")
+
+
 def callback(db: Session, provider_id: str, code: str, state: str) -> CallbackResult:
     st = db.scalar(select(AuthState).where(AuthState.state == state, AuthState.provider == provider_id))
     if st is None:

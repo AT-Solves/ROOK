@@ -19,7 +19,10 @@ class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         data = {"ts": round(record.created, 3), "level": record.levelname, "logger": record.name,
                 "msg": record.getMessage(), "request_id": request_id.get()}
-        for key in ("method", "path", "status", "duration_ms", "org_id"):
+        for key in ("method", "path", "status", "duration_ms", "org_id",
+                    # Microsoft OAuth failure diagnostics: shape-checked values only (rook.identity.diagnostics)
+                    "provider", "operation", "account", "oauth_error", "aadsts_code", "http_status",
+                    "microsoft_request_id", "microsoft_correlation_id"):
             if hasattr(record, key):
                 data[key] = getattr(record, key)
         if record.exc_info:
