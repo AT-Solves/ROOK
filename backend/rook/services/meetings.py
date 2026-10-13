@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import Commitment, Decision, Meeting, Person, Risk, Signal, User, utcnow
-from ..trust import FACT, RECOMMENDATION, claim
+from ..models import Commitment, Decision, Meeting, Person, Project, Risk, Signal, User, utcnow
+from ..trust import FACT, RECOMMENDATION, UNKNOWN, claim
 from .text import overlap
 from .views import Viewer, signal_ref
 
@@ -85,6 +85,75 @@ def suggested_questions(v: Viewer, ctx: dict) -> list[dict]:
             for q in list(dict.fromkeys(qs))[:6]]
 
 
+COVERAGE_LABELS = {"sufficient": "Sufficient context", "limited": "Limited context", "insufficient": "Insufficient context"}
+
+
+def _n(count: int, one: str, many: str | None = None) -> str:
+    return f"{count} {one if count == 1 else (many or one + 's')}"
+
+
+def context_coverage(db: Session, m: Meeting, ctx: dict, previous: list, related: list) -> dict:
+    """What context ROOK actually had when preparing this meeting (no new relationships are inferred).
+
+    Decisions, risks and related correspondence are found only through the meeting's ROOK project, so without one
+    they are not evaluated: their absence is UNKNOWN, never "none". Open actions and earlier meetings are always
+    evaluated (by project, else by attendee ownership and identical title). Statements follow Context health:
+    FACT for what ROOK inspected, UNKNOWN for what it cannot determine, RECOMMENDATION for a supported next step.
+    """
+    project = db.get(Project, m.project_id) if m.project_id else None
+    linked = project is not None
+    items = {
+        "decisions": {"evaluated": linked, "count": len(ctx["decisions"])},
+        "risks": {"evaluated": linked, "count": len(ctx["risks"])},
+        "commitments": {"evaluated": True, "count": len(ctx["commitments"])},
+        "previous_meetings": {"evaluated": True, "count": len(previous)},
+        "sources": {"evaluated": linked, "count": len(related)},
+    }
+    project_items = sum(items[k]["count"] for k in ("decisions", "risks", "commitments", "sources"))
+    other_items = items["commitments"]["count"] + items["previous_meetings"]["count"]
+    if linked:
+        state = "sufficient" if project_items else "limited"
+    else:
+        state = "limited" if other_items else "insufficient"
+
+    reasons = [{"text": f"Meeting details and {_n(len(m.attendees), 'participant')} are available.", "claim_type": FACT,
+                "kind": "found"}]
+    if linked:
+        reasons += [
+            {"text": f"Linked to the ROOK project {project.name}.", "claim_type": FACT, "kind": "found"},
+            {"text": f"Checked {project.name}: {_n(items['decisions']['count'], 'decision')}, "
+                     f"{_n(items['risks']['count'], 'open risk')} and {_n(items['sources']['count'], 'recent related message')} "
+                     "you can access.", "claim_type": FACT, "kind": "found"},
+            {"text": f"{_n(items['commitments']['count'], 'open action')} on this project.", "claim_type": FACT, "kind": "found"},
+        ]
+    else:
+        reasons += [
+            {"text": "This meeting is not linked to a ROOK project.", "claim_type": FACT, "kind": "found"},
+            {"text": f"{_n(items['commitments']['count'], 'open action')} owned by participants.", "claim_type": FACT,
+             "kind": "found"},
+            {"text": "Project-level decisions, risks and related correspondence cannot be evaluated until the meeting "
+                     "is linked to a project.", "claim_type": UNKNOWN, "kind": "unknown"},
+            # Projects and their aliases are defined by an administrator (ADR-0003); meetings are re-linked at each sync.
+            {"text": "A ROOK administrator can define a project with the names this meeting uses as its aliases; the "
+                     "meeting is then linked at the next sync.", "claim_type": RECOMMENDATION, "kind": "next"},
+        ]
+    reasons.append({"text": f"{_n(items['previous_meetings']['count'], 'earlier meeting')} on this topic.",
+                    "claim_type": FACT, "kind": "found"})
+
+    if state == "sufficient":
+        summary = f"ROOK prepared this meeting from what is linked to {project.name}."
+    elif linked:
+        summary = f"This meeting is linked to {project.name}, but ROOK has found nothing linked to it yet."
+    elif state == "limited":
+        summary = "ROOK has the meeting details and participants, but this meeting is not linked to a ROOK project yet."
+    else:
+        summary = ("ROOK has only the meeting details and participants: this meeting is not linked to a ROOK project "
+                   "and nothing else is linked to it yet.")
+    return {"state": state, "label": COVERAGE_LABELS[state], "summary": summary,
+            "project": {"linked": linked, "name": project.name if project else None},
+            "items": items, "reasons": reasons}
+
+
 def preparation(db: Session, user: User, m: Meeting) -> dict:
     v = Viewer(db, user)
     ctx = _context(db, v, m)
@@ -104,6 +173,7 @@ def preparation(db: Session, user: User, m: Meeting) -> dict:
         "risks": [v.risk(r) for r in ctx["risks"]],
         "related_signals": [signal_ref(s) for s in related],
         "suggested_questions": suggested_questions(v, ctx),
+        "context_coverage": context_coverage(db, m, ctx, previous, related),
     }
 
 

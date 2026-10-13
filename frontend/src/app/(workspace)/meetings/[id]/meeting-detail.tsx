@@ -11,7 +11,7 @@ import { RookButton as Button, RookCard, RookIcon as Icon, RookPageHeader, RookS
 import { ClaimBadge, StatusText } from "@/components/trust";
 import { ApiError, api } from "@/lib/api";
 import { formatDateTime, formatTime } from "@/lib/format";
-import type { MeetingIntel, MeetingPrep } from "@/lib/types";
+import type { ContextCoverage, MeetingIntel, MeetingPrep } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
 /** Meeting detail (UX §6): preparation first; for past meetings, the extracted outcome. */
@@ -26,6 +26,7 @@ export function MeetingDetail({ id }: { id: number }) {
 
 function Detail({ prep, intel, onChange }: { prep: MeetingPrep; intel: MeetingIntel; onChange: () => void }) {
   const m = prep.meeting;
+  const cov = prep.context_coverage;
   const past = new Date(m.ends_at) < new Date();
   return (
     <>
@@ -42,6 +43,8 @@ function Detail({ prep, intel, onChange }: { prep: MeetingPrep; intel: MeetingIn
           <span><span className="font-semibold">Preparation suggested:</span> {prep.prep_reasons.join("; ")}.</span>
         </p>
       ) : null}
+
+      <Coverage c={prep.context_coverage} />
 
       <div className="grid gap-x-8 lg:grid-cols-2">
         <Section title="Purpose" id="md-purpose" icon="target">
@@ -70,17 +73,21 @@ function Detail({ prep, intel, onChange }: { prep: MeetingPrep; intel: MeetingIn
           {prep.suggested_questions.length ? (
             <ul className="space-y-2">{prep.suggested_questions.map((q, i) => <RecommendationClaim key={i} claim={q} />)}</ul>
           ) : (
-            <Empty title="No suggested questions.">There are no open risks, pending decisions or due actions linked to this meeting.</Empty>
+            <Empty title="No suggested questions.">
+              {cov.project.linked
+                ? "There are no open risks, pending decisions or due actions linked to this meeting."
+                : "ROOK suggests questions from risks, decisions and actions linked to a meeting; this meeting is not linked to a project yet."}
+            </Empty>
           )}
         </Section>
       ) : null}
 
       <Section title="Related risks" id="md-risks" count={prep.risks.length} icon="risk">
-        {prep.risks.length ? <ul className="space-y-3">{prep.risks.map((r) => <RiskCard key={r.id} r={r} />)}</ul> : <Empty title="No open risks linked to this meeting." />}
+        {prep.risks.length ? <ul className="space-y-3">{prep.risks.map((r) => <RiskCard key={r.id} r={r} />)}</ul> : <Empty title={cov.items.risks.evaluated ? "No open risks are linked to this meeting." : "ROOK cannot evaluate project-level risks for this meeting yet because no project is linked."} />}
       </Section>
 
       <Section title="Related decisions" id="md-decisions" count={prep.decisions.length} icon="flag">
-        {prep.decisions.length ? <ul className="space-y-3">{prep.decisions.map((d) => <DecisionCard key={d.id} d={d} />)}</ul> : <Empty title="No decisions linked to this meeting's project yet." />}
+        {prep.decisions.length ? <ul className="space-y-3">{prep.decisions.map((d) => <DecisionCard key={d.id} d={d} />)}</ul> : <Empty title={cov.items.decisions.evaluated ? "No decisions are linked to this meeting." : "ROOK cannot evaluate project-level decisions for this meeting yet because no project is linked."} />}
       </Section>
 
       <Section title="Open actions" id="md-actions" count={prep.open_commitments.length} icon="checkSquare">
@@ -112,10 +119,40 @@ function Detail({ prep, intel, onChange }: { prep: MeetingPrep; intel: MeetingIn
             <ul className="space-y-4">{prep.related_signals.map((s) => <SourceLine key={s.signal_id} e={s} />)}</ul>
           </RookCard>
         ) : (
-          <Empty title="No related sources you can access." />
+          <Empty title={cov.items.sources.evaluated ? "No related sources you can access." : "No related project correspondence is available because this meeting is not linked to a project."} />
         )}
       </Section>
     </>
+  );
+}
+
+const COVERAGE_MARK: Record<ContextCoverage["state"], { icon: "checkCircle" | "status" | "lock"; color: string }> = {
+  sufficient: { icon: "checkCircle", color: "text-success" },
+  limited: { icon: "status", color: "text-gold-deep" },
+  insufficient: { icon: "lock", color: "text-chess" },
+};
+
+/** What ROOK had when preparing this meeting: FACT for what it inspected, UNKNOWN for what it could not evaluate. */
+function Coverage({ c }: { c: ContextCoverage }) {
+  const mark = COVERAGE_MARK[c.state];
+  return (
+    <Section title="Context coverage" id="md-coverage" icon="insight">
+      <RookCard level={2}>
+        <p className="flex items-center gap-2 text-[15px] font-semibold text-midnight">
+          <Icon name={mark.icon} size={18} className={mark.color} />
+          {c.label}
+        </p>
+        <p className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">{c.summary}</p>
+        <ul aria-label="What ROOK knows about this meeting" className="mt-3 space-y-1.5 text-[13.5px] text-ink-soft">
+          {c.reasons.map((r, i) => (
+            <li key={i} data-claim-type={r.claim_type} className="flex items-start gap-2">
+              <ClaimBadge type={r.claim_type} className="mt-px shrink-0" />
+              <span>{r.text}</span>
+            </li>
+          ))}
+        </ul>
+      </RookCard>
+    </Section>
   );
 }
 

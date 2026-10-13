@@ -29,7 +29,11 @@ test("executive workflow: attention → meeting → evidence → ask → recomme
   await page.getByRole("region", { name: /^Today's moves/ }).getByRole("link", { name: "Phoenix Product Review" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Phoenix Product Review" })).toBeVisible();
   await expect(main).toContainText("Preparation suggested");
-  for (const section of ["Purpose", "Participants", "Suggested questions", "Related risks", "Related decisions", "Open actions", "Previous context", "Sources"]) {
+  const coverage = page.getByRole("region", { name: /Context coverage/ });
+  await expect(coverage).toContainText("Sufficient context"); // the demo meeting is linked to Project Phoenix
+  await expect(coverage).toContainText("Linked to the ROOK project Project Phoenix.");
+  await expect(coverage.locator('[data-claim-type="UNKNOWN"]')).toHaveCount(0);
+  for (const section of ["Context coverage", "Purpose", "Participants", "Suggested questions", "Related risks", "Related decisions", "Open actions", "Previous context", "Sources"]) {
     await expect(page.getByRole("heading", { level: 2, name: new RegExp(`^${section}`) })).toBeVisible();
   }
   await expect(page.getByRole("region", { name: /Suggested questions/ }).locator('[data-claim-type="RECOMMENDATION"]').first()).toBeVisible();
