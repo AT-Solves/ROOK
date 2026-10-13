@@ -205,6 +205,17 @@ export interface MeetingPrep {
   risks: Risk[];
   related_signals: EvidenceRef[];
   suggested_questions: Claim[];
+  context_coverage: ContextCoverage;
+}
+
+/** What ROOK actually had when preparing a meeting. ``evaluated: false`` means not inspected (unknown), not "none". */
+export interface ContextCoverage {
+  state: "sufficient" | "limited" | "insufficient";
+  label: string;
+  summary: string;
+  project: { linked: boolean; name: string | null };
+  items: Record<"decisions" | "risks" | "commitments" | "previous_meetings" | "sources", { evaluated: boolean; count: number }>;
+  reasons: { text: string; claim_type: ClaimType; kind: "found" | "unknown" | "next" }[];
 }
 
 export interface MeetingIntel {
