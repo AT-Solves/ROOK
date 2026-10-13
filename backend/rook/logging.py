@@ -27,6 +27,20 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(data)
 
 
+class AccessLogWithoutQuery(logging.Filter):
+    """Uvicorn's access log prints the request target with its query string, which for the OAuth callback carries the
+    one-time authorization code and state. Keep the path only, as ``rook.http`` does; nothing from the query is kept.
+
+    Uvicorn logs ``'%s - "%s %s HTTP/%s" %d'`` with args ``(client, method, path_with_query, http_version, status)``.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str) and "?" in args[2]:
+            record.args = (*args[:2], args[2].split("?", 1)[0], *args[3:])
+        return True
+
+
 def configure(level: int = logging.INFO) -> None:
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter())
@@ -34,6 +48,9 @@ def configure(level: int = logging.INFO) -> None:
     root.handlers[:] = [handler]
     root.setLevel(level)
     logging.getLogger("httpx").setLevel(logging.WARNING)  # its INFO lines include full URLs with query strings
+    access = logging.getLogger("uvicorn.access")  # a logger filter: kept when uvicorn applies its own logging config
+    if not any(isinstance(f, AccessLogWithoutQuery) for f in access.filters):
+        access.addFilter(AccessLogWithoutQuery())
 
 
 def install_middleware(app) -> None:
